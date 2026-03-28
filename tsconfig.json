@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+
+    "strict": true,
+    "jsx": "preserve",
+
+    "types": ["node"],
+
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+
+    "noEmit": true,
+
+    "lib": ["ESNext", "DOM"]
+  }
+}
