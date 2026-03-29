@@ -26,7 +26,7 @@ export default defineConfig(({ command }) => ({
                 features: 'src/features/index.ts'
             },
             name: 'VueTimelineEditor',
-            fileName: (format) => `index.${format}.js`
+            fileName: (format, entryName) => `${entryName}.${format}.js`
         },
 
         rollupOptions: {

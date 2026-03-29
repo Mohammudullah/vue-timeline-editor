@@ -5,18 +5,19 @@
     "author": "Mohammadullah",
     "license": "MIT",
     "type": "module",
-    "main": "dist/index.umd.js",
+    "main": "dist/index.cjs.js",
     "module": "dist/index.es.js",
     "types": "dist/index.d.ts",
     "style": "dist/style.css",
     "exports": {
         ".": {
             "import": "./dist/index.es.js",
-            "require": "./dist/index.umd.js",
+            "require": "./dist/index.cjs.js",
             "types": "./dist/index.d.ts"
         },
         "./features": {
-            "import": "./dist/features/index.js",
+            "import": "./dist/features.es.js",
+            "require": "./dist/features.cjs.js",
             "types": "./dist/features/index.d.ts"
         },
         "./style.css": "./dist/style.css"
@@ -29,7 +30,7 @@
     ],
     "scripts": {
         "dev": "vite",
-        "build": "vue-tsc -p tsconfig.build.json && vite build",
+        "build": "vite build && vue-tsc -p tsconfig.build.json",
         "preview": "vite preview"
     },
     "peerDependencies": {
