@@ -5,6 +5,9 @@ import { TimelineRangeInterface, TimelineSectionInterface } from '../types/timel
 import { TimelineConfigInterface, useTimelineConfig } from '../composables/timelineConfig';
 import XAxis from './Timeline/Axis/XAxis.vue';
 
+import '../styles/style.css';
+import '../styles/basic-theme.css';
+
 
 const props = withDefaults(defineProps<{
     range?: TimelineRangeInterface,
@@ -12,7 +15,7 @@ const props = withDefaults(defineProps<{
 }>(), {
     range: () => ({
         start_seconds: 0, //start at 12:00 am
-        end_seconds: 24 * 60 * 60 * 1000 //end at 11:59 pm
+        end_seconds: 24 * 60 * 60 //end at 11:59 pm
     }),
 })
 
