@@ -6,7 +6,6 @@ import { TimelineConfigInterface, useTimelineConfig } from '../composables/timel
 import XAxis from './Timeline/Axis/XAxis.vue';
 
 import '../styles/style.css';
-import '../styles/basic-theme.css';
 
 
 const props = withDefaults(defineProps<{
@@ -45,7 +44,7 @@ onMounted(() => {
 
 </script>
 <template>
-    <div class="vtd__timeline-container" ref="timelineContainer">
+    <div class="vtd__timeline-container vtd" ref="timelineContainer">
         
         <XAxis
             :config="timelineConfig"

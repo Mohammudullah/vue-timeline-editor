@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Timeline } from '../src'
+import Timeline from '../src/components/Timeline.vue';
+import '../src/styles/basic-theme.css';
 
 </script>
 

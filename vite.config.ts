@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -9,13 +10,14 @@ const __dirname = path.dirname(__filename)
 
 export default defineConfig(({ command }) => ({
 
-    plugins: [vue()],
+    plugins: [vue(), cssInjectedByJsPlugin()],
 
     root: command === 'serve' ? 'playground' : '.',
 
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, 'src')
+            '@': path.resolve(__dirname, 'src'),
+            'vue-timeline-editor': path.resolve(__dirname, 'dist/index.es.js')
         }
     },
 

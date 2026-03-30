@@ -1,5 +1,7 @@
 .vtd__time-axis {
     display: flex;
+    user-select: none;
+    
 }
 
 .vtd__time-axis-major-tick {

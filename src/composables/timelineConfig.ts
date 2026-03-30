@@ -13,6 +13,9 @@ export const useTimelineConfig = (
         zoom?: number,
         xAxisHeight?: number,
         yAxisWidth?: number,
+        time: {
+            
+        }
     }
 ): TimelineConfigInterface => {
 

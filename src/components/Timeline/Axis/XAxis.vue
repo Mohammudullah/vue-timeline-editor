@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { TimelineInterface } from '../../../composables/timeline';
 import { TimelineConfigInterface } from '../../../composables/timelineConfig';
-import TimeAxis from './TimeAxis.vue';
+import TimeAxis from './TimeAxis/TimeAxis.vue';
 
 
 const props = withDefaults(defineProps<{

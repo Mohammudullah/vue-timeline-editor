@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { TimelineInterface } from '../../../composables/timeline';
-import { TimelineConfigInterface } from '../../../composables/timelineConfig';
-import useUtils from '../../../composables/utils';
+import { TimelineInterface } from '../../../../composables/timeline';
+import { TimelineConfigInterface } from '../../../../composables/timelineConfig';
+import useUtils from '../../../../composables/utils';
+import MinorTicks from './MinorTicks.vue';
 
 
 const props = withDefaults(defineProps<{
@@ -53,7 +54,7 @@ const majorTicks = computed<number[]>(() => {
                     width: `${config.grids.gridGap}px` 
                 }"
             >
-                | <span 
+                <span 
                     class="vtd__time-axis-major-tick-label"
                     :style="{
                         width: `${config.grids.gridGap * props.config.grids.minorGridsPerMajor}px`
@@ -64,18 +65,11 @@ const majorTicks = computed<number[]>(() => {
 
             </div>
 
-            <div v-if="config.grids.minorGridInterval > 0" class="vtd__time-axis-minor-ticks">
-                <div 
-                    v-for="minorTick in minorTicks(tick)" 
-                    :key="minorTick" 
-                    class="vtd__time-axis-minor-tick"
-                    :style="{
-                        width: `${config.grids.gridGap}px` 
-                    }"
-                >
-                    |
-                </div>
-            </div>
+            <MinorTicks
+                v-if="config.grids.minorGridInterval > 0" 
+                :ticks="minorTicks(tick)" 
+                :gridGap="config.grids.gridGap"
+            />
         </div>
     </div>
 </template>

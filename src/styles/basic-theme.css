@@ -1,0 +1,36 @@
+/**
+* @file basic-theme.css
+* @description This file defines the basic theme for the timeline editor, including default font settings and box-sizing rules.
+* It serves as a foundation for styling the timeline editor and can be extended or overridden by custom themes.
+**/
+
+
+/**------------ Global Styles Start ---------------**/
+:root {
+    --vtd__primary-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --vtd__secondary-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.vtd, .vtd * {
+    box-sizing: border-box;
+    font-family: var(--vtd__primary-font-family);
+}
+
+/**------------ Global Styles End ---------------**/
+
+
+/**------------ Time Axis Styles Start ---------------**/
+
+.vtd__time-axis-major-tick-content {
+    border-left: 2px solid red;
+    height: 15px;
+}
+
+.vtd__time-axis-minor-tick {
+    border-left: 1px solid red;
+    height: 10px;
+}
+
+.vtd__time-axis-minor-center-tick {
+    height: 15px;
+}
