@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import useUtils from '../../../../composables/utils';
+
 
 const props = withDefaults(defineProps<{
     ticks: number[],
@@ -6,6 +8,8 @@ const props = withDefaults(defineProps<{
 }>(), {
     
 })
+
+const { secondsToTimeString } = useUtils();
 
 </script>
 

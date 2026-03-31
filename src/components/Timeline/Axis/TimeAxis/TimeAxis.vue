@@ -13,62 +13,87 @@ const props = withDefaults(defineProps<{
    
 })
 
-const { secondsToTimeString, secondsToDayTimeString } = useUtils();
+const { secondsToTimeString } = useUtils();
 
 const minorTicks = (majorTick: number): number[] => {
     const ticks: number[] = [];
-    for (let i = 1; i < props.config.grids.minorGridsPerMajor; i++) {
-        ticks.push(majorTick + i * props.config.grids.minorGridInterval * 1000);
+
+    if(majorTick >= props.config.range.end_seconds! * 1000) {
+        return ticks; // No minor ticks if the major tick is at or beyond the end of the timeline
     }
+
+    for (let i = 1; i < props.config.cols.minorGridsPerMajor; i++) {
+        ticks.push(majorTick + i * props.config.cols.minorGridInterval * 1000);
+    }
+
     return ticks;
 }
 
 const endSeconds = computed<number>(() => {
-    return props.timeline.range.end_seconds ? props.timeline.range.end_seconds : 24 * 60 * 60 * 1000;
+    return props.config.range.end_seconds ? props.config.range.end_seconds : 24 * 60 * 60 * 1000;
 })
 
 const majorTicks = computed<number[]>(() => {
     const ticks: number[] = [];
 
-    for (let i = 0; i <= endSeconds.value; i += props.config.grids.majorGridInterval) {
+    for (let i = 0; i <= endSeconds.value; i += props.config.cols.majorGridInterval) {
+        if(i >= endSeconds.value) {
+            break; // Stop if the next major tick exceeds the end of the timeline
+        }
+
         ticks.push(i * 1000); // Convert to milliseconds
     }
+
+    console.log('majorTicks', ticks)
     return ticks;
+})
+
+
+const majorGridsWidth = computed<number>(() => {
+    return props.config.cols.gap * props.config.cols.minorGridsPerMajor;
 })
 
 </script>
 
 <template>
-    <div class="vtd__time-axis">
+    <div 
+        class="vtd__time-axis"
+        :style="{
+            width: `${config.cols.totalPixels}px`
+        }"
+    >
         <div 
             v-for="tick in majorTicks" 
             :key="tick" 
             class="vtd__time-axis-major-tick"
             :style="{
-                width: `${config.grids.gridGap * props.config.grids.minorGridsPerMajor}px`
+                width: `${majorGridsWidth}px`
             }"
         >
             <div 
                 class="vtd__time-axis-major-tick-content"
                 :style="{
-                    width: `${config.grids.gridGap}px` 
+                    width: `${config.cols.gap}px` 
                 }"
             >
                 <span 
                     class="vtd__time-axis-major-tick-label"
                     :style="{
-                        width: `${config.grids.gridGap * props.config.grids.minorGridsPerMajor}px`
+                        width: `${majorGridsWidth}px`
                     }"
                 >
-                    {{ secondsToTimeString(tick / 1000) }}
+                    {{ secondsToTimeString({
+                        seconds: tick / 1000, // Convert back to seconds
+                        format: props.config.timeAxis.timeFormat
+                    }) }}
                 </span>
 
             </div>
 
             <MinorTicks
-                v-if="config.grids.minorGridInterval > 0" 
+                v-if="config.cols.minorGridInterval > 0" 
                 :ticks="minorTicks(tick)" 
-                :gridGap="config.grids.gridGap"
+                :gridGap="config.cols.gap"
             />
         </div>
     </div>

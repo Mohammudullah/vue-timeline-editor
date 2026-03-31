@@ -19,7 +19,7 @@
             "require": "./dist/features.cjs.js",
             "types": "./dist/features/index.d.ts"
         },
-        "./themes/basic": "./dist/basic-theme.css"
+        "./basic-theme.css": "./dist/basic-theme.css"
     },
     "files": [
         "dist"
@@ -29,7 +29,7 @@
     ],
     "scripts": {
         "dev": "vite",
-        "build": "vite build && node -e \"require('fs').copyFileSync('src/styles/basic-theme.css','dist/basic-theme.css')\" && vue-tsc -p tsconfig.build.json",
+        "build": "vite build && node -e \"require('fs').copyFileSync('src/styles/basic-theme.css','dist/basic-theme.css')\" && vue-tsc -p tsconfig.build.json && node -e \"require('fs').mkdirSync('dist/types',{recursive:true});require('fs').copyFileSync('src/types/timeline.d.ts','dist/types/timeline.d.ts')\"",
         "preview": "vite preview"
     },
     "peerDependencies": {

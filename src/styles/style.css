@@ -1,3 +1,20 @@
+.vtd__timeline-container {
+    display: flex;
+    overflow: hidden;
+    position: relative;
+}
+
+.vtd__x-axis {
+    overflow: hidden;
+    width: 100%;
+    flex-shrink: 0;
+    display: flex;
+}
+
+.vtd__x-axis-y-axis-spacing {
+    flex-shrink: 0;
+}
+
 .vtd__time-axis {
     display: flex;
     user-select: none;
@@ -12,15 +29,41 @@
     display: flex;
 }
 
-.vtd__time-axis-major-tick-content {
+.vtd__timeline-editor-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: column;
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.vtd__timeline-editor-wrapper::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+}
+
+.vtd__timeline-editor-wrapper-inner {
+    display: flex;
+    flex-shrink: 0;
+    overflow-y: auto;
+    align-items: flex-start;
+    height: 100%;
+    flex-shrink: 0;
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
     position: relative;
 }
 
-.vtd__time-axis-major-tick-label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: inline-block;
-    position: absolute;
-    top: 100%;
-    left: -2px;
+.vtd__timeline-sections {
+    flex-shrink: 0;
 }
+
+.vtd__timeline-editor-wrapper-inner::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+}
+
+.vtd__timeline-editor-row-axis {
+    position: sticky;
+    left: 0;
+    top: 0;
+} 

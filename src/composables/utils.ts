@@ -1,11 +1,21 @@
+export type TimeStringTimeFormatOptions = 'HH:mm:ss' | 'HH:mm' | 'hh:mm:ss a' | 'hh:mm a'; 
+
 const useUtils = () => {
 
-    const secondsToDayTimeString = (
-        seconds: number,
-        is24: boolean,
-        showEmptySeconds: boolean,
-        showEmptyMinutes: boolean
-    ): string => {
+
+    const secondsToTimeString = ({
+        seconds = 0, 
+        format = 'HH:mm:ss', 
+        hideEmptySeconds = true, 
+        hideEmptyMinutes = true,
+        ignoreLeadingZeroHours = true
+    }: {
+        seconds?: number,
+        format?: TimeStringTimeFormatOptions,
+        hideEmptySeconds?: boolean,
+        hideEmptyMinutes?: boolean,
+        ignoreLeadingZeroHours?: boolean
+    }): string => {
         const date = new Date(seconds * 1000);
 
         const hours = date.getUTCHours();
@@ -13,46 +23,32 @@ const useUtils = () => {
         const secondsPart = date.getUTCSeconds();
 
         const ampm = hours >= 12 ? 'PM' : 'AM';
-        const hours12 = hours % 12 || 12;
+        const hours12 = hours % 12 || 12;   
 
-        const h = is24
-            ? hours.toString().padStart(2, '0')
-            : hours12.toString();
+        const h = ignoreLeadingZeroHours ? hours12.toString() : hours12.toString().padStart(2, '0');
 
         const m = minutes.toString().padStart(2, '0');
         const s = secondsPart.toString().padStart(2, '0');
 
         let result = h;
 
-        // Minutes
-        if (showEmptyMinutes || minutes !== 0 || secondsPart !== 0) {
+        if (format.includes('mm') && (!hideEmptyMinutes || minutes > 0)) {
             result += `:${m}`;
         }
 
-        // Seconds
-        if (showEmptySeconds || secondsPart !== 0) {
+        if (format.includes('ss') && (!hideEmptySeconds || secondsPart > 0)) {
             result += `:${s}`;
         }
 
-        if (!is24) {
+        if (format.includes('a')) {
             result += ` ${ampm}`;
         }
 
         return result;
-    };
-
-
-    const secondsToTimeString = (seconds: number): string => {
-        const date = new Date(seconds * 1000);
-        const hours = date.getUTCHours();
-        const minutes = date.getUTCMinutes();
-        const secondsPart = date.getUTCSeconds();
-        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secondsPart.toString().padStart(2, '0')}`;
     }
 
     return {
         secondsToTimeString,
-        secondsToDayTimeString
     }
 }
 

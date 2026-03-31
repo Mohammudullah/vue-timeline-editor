@@ -7,13 +7,21 @@
 
 /**------------ Global Styles Start ---------------**/
 :root {
-    --vtd__primary-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    --vtd__secondary-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --vtd__theme-secondary-font-family: var(--vtd__primary-font-family, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
+    --vtd__theme-primary-font-family: var(--vtd__primary-font-family, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif);
+
+    /** Time Axis Colors **/
+    --vtd__theme-time-axis-major-tick-color: var(--vtd__time-axis-major-tick-color, black);
+    --vtd__theme-time-axis-minor-tick-color: var(--vtd__time-axis-minor-tick-color, black);
+    --vtd__theme-time-axis-bg: var(--vtd__time-axis-bg, rgb(238, 238, 238));
 }
 
 .vtd, .vtd * {
     box-sizing: border-box;
-    font-family: var(--vtd__primary-font-family);
+    font-family: var(--vtd__theme-primary-font-family);
+    margin: 0;
+    padding: 0;
+    line-height: normal;
 }
 
 /**------------ Global Styles End ---------------**/
@@ -21,16 +29,54 @@
 
 /**------------ Time Axis Styles Start ---------------**/
 
+.vtd__time-axis {
+    background-color: var(--vtd__theme-time-axis-bg);
+    height: 100%;
+}
+
 .vtd__time-axis-major-tick-content {
-    border-left: 2px solid red;
+    border-left: 2px solid var(--vtd__theme-time-axis-major-tick-color);
     height: 15px;
 }
 
 .vtd__time-axis-minor-tick {
-    border-left: 1px solid red;
+    border-left: 1px solid var(--vtd__theme-time-axis-minor-tick-color);
     height: 10px;
 }
 
 .vtd__time-axis-minor-center-tick {
     height: 15px;
 }
+
+.vtd__time-axis-major-tick-content {
+    position: relative;
+}
+
+.vtd__time-axis-major-tick-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    position: absolute;
+    top: 100%;
+    left: -.3rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding-top: .1rem;
+    padding-bottom: .1rem;
+}
+
+/**------------ Time Axis Styles End ---------------**/
+
+/**------------ Row Axis Styles Start ---------------**/
+.vtd__timeline-editor-row-axis {
+    position: sticky;
+    left: 0;
+}
+/**------------ Row Axis Styles End ---------------**/
+
+
+/**------------ Row Styles Start ---------------**/
+.vtd__timeline-editor-row {
+    border-bottom: 1px solid rgb(238, 238, 238);
+}
+/**------------ Row Styles End ---------------**/

@@ -15,8 +15,16 @@ const props = withDefaults(defineProps<{
 
 <template>
     <div class="vtd__x-axis" :style="{
-        height: config.xAxisHeight + 'px'
+        height: config.cols.labelHeight + 'px',
+        width: config.editor.wrapper.width + 'px'
     }">
+        <div class="vtd__x-axis-y-axis-spacing"
+            :style="{
+                width: config.rows.labelWidth + 'px'
+            }"
+        >
+
+        </div>
         <TimeAxis 
             :config="config"
             :timeline="timeline"

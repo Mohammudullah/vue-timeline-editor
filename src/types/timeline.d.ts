@@ -1,10 +1,16 @@
 export interface TimelineRangeInterface {
+    start_seconds: number,
+    end_seconds: number
+}
+
+export interface TimelineRangeArgInterface {
     start_seconds: number | null,
     end_seconds: number | null
 }
 
 export interface TimelineSectionInterface {
     title: string,
+    id: string | number,
     rows: TimelineRowInterface[]
 }
 
