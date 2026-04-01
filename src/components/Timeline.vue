@@ -25,20 +25,19 @@ const props = withDefaults(defineProps<{
 
 const emits = defineEmits<{
     'init': [value: { config: TimelineConfigInterface, timeline: TimelineInterface, container: HTMLDivElement | null }],
-    'scrollX': [value: Event],
-    'scrollY': [value: Event]
+    'scroll': [value: Event]
 }>() 
 
 const timelineContainer = ref<HTMLDivElement | null>(null)
 const timelineEditor = ref<HTMLDivElement | null>(null);
-const scrollXEl = ref<HTMLDivElement | null>(null);
-const scrollYEl = ref<HTMLDivElement | null>(null);
+const scrollPaneEl = ref<HTMLDivElement | null>(null);
+const scrollLeft = ref(0);
+const scrollTop = ref(0);
 
 const timelineConfig = useTimelineConfig({
     timelineContainer,
     timelineEditor,
-    scrollXEl,
-    scrollYEl,
+    scrollPaneEl,
     initialRange: () => props.initialRange,
     timeAxisTimeFormat: props.timeAxisTimeFormat,
 
@@ -48,6 +47,17 @@ const timeline = useTimeline({
     config: timelineConfig,
     sections: () => props.sections,
 });
+
+const onTimelineScroll = (event: Event) => {
+    const target = event.target as HTMLDivElement | null;
+
+    if (!target) return;
+
+    scrollLeft.value = target.scrollLeft;
+    scrollTop.value = target.scrollTop;
+
+    emits('scroll', event)
+}
 
 onMounted(() => {
     emits('init', {
@@ -68,39 +78,52 @@ onMounted(() => {
     
     >
 
-        <div 
-            class="vtd__timeline-editor-wrapper"
-            @scroll="(event) => emits('scrollX', event)"
-            ref="scrollXEl"
-            :style="{
-                width: timelineConfig.editor.wrapper.width + 'px',
-            }"
-        >
-            <XAxis
-                :config="timelineConfig"
-                :timeline="timeline"
+        <div class="vtd__timeline-header">
+            <div
+                class="vtd__timeline-header-spacer"
+                :style="{
+                    width: timelineConfig.rows.labelWidth + 'px',
+                    height: timelineConfig.cols.labelHeight + 'px'
+                }"
             />
 
-            <div 
-                class="vtd__timeline-editor-wrapper-inner"
-                @scroll="(event) => emits('scrollY', event)"
-                ref="scrollYEl"                                                                                                                                                                                                                                                                                                                                                                                                                                 
-                :style="{
-                    width: timelineConfig.editor.wrapper.width + 'px',
-                    height: `calc(100% - ${timelineConfig.cols.labelHeight}px)`
-                }"
+            <div class="vtd__timeline-header-main">
+                <XAxis
+                    :config="timelineConfig"
+                    :timeline="timeline"
+                    :style="{
+                        transform: `translateX(${-scrollLeft}px)`
+                    }"
+                />
+            </div>
+        </div>
 
-            >
+        <div
+            class="vtd__timeline-body"
+            :style="{
+                height: `calc(100% - ${timelineConfig.cols.labelHeight}px)`
+            }"
+        >
+            <div class="vtd__timeline-y-axis-pane">
                 <YAxis
                     :config="timelineConfig"
                     :timeline="timeline"
+                    :style="{
+                        transform: `translateY(${-scrollTop}px)`
+                    }"
                 />
+            </div>
 
+            <div
+                class="vtd__wrapper"
+                @scroll="onTimelineScroll"
+                ref="scrollPaneEl"
+            >
                 <div
-                    class="vtd__timeline-editor-area"
+                    class="vtd__area"
                     ref="timelineEditor"
                     :style="{
-                        width: timelineConfig.editor.axis.x.width + 'px',
+                        width: timelineConfig.editor.width + 'px',
                     }"
                 >
 

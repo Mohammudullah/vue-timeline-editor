@@ -19,7 +19,10 @@ const props = withDefaults(defineProps<{
             <Rows
                 :row-height="config.rows.height"
                 :row-label-width="config.rows.labelWidth"
+                :row-padding-right="config.editor.paddingRight"
+                :row-padding-left="config.editor.paddingLeft"
                 :rows="section.rows"
+                :col-pixel-per-ms="config.cols.pixelPerMs"
             />
         </div>
     </div>

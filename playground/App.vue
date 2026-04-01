@@ -17,8 +17,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame1',
                         title: 'Frame 1',
-                        start_seconds: 0,
-                        end_seconds: 60 * 60 * 1000
+                        start_ms: 0,
+                        end_ms: 2 * 60 * 60 * 1000
                     }]
                 },
                 {
@@ -27,8 +27,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame2',
                         title: 'Frame 2',
-                        start_seconds: 60 * 60 * 1000,
-                        end_seconds: 2 * 60 * 60 * 1000
+                        start_ms: 2 * 60 * 60 * 1000,
+                        end_ms: 4 * 60 * 60 * 1000
                     }]
                 },
                 {
@@ -37,8 +37,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame3',
                         title: 'Frame 3',
-                        start_seconds: 2 * 60 * 60 * 1000,
-                        end_seconds: 3 * 60 * 60 * 1000
+                        start_ms: 4 * 60 * 60 * 1000,
+                        end_ms: 6 * 60 * 60 * 1000
                     }]
                 },
                 {
@@ -47,8 +47,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame4',
                         title: 'Frame 4',
-                        start_seconds: 3 * 60 * 60 * 1000,
-                        end_seconds: 4 * 60 * 60 * 1000
+                        start_ms: 6 * 60 * 60 * 1000,
+                        end_ms: 8 * 60 * 60 * 1000
                     }]
                 },
                 {
@@ -57,8 +57,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame5',
                         title: 'Frame 5',
-                        start_seconds: 4 * 60 * 60 * 1000,
-                        end_seconds: 5 * 60 * 60 * 1000
+                        start_ms: 8 * 60 * 60 * 1000,
+                        end_ms: 10 * 60 * 60 * 1000
                     }]
                 },
                 {
@@ -67,8 +67,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame6',
                         title: 'Frame 6',
-                        start_seconds: 5 * 60 * 60 * 1000,
-                        end_seconds: 6 * 60 * 60 * 1000
+                        start_ms: 10 * 60 * 60 * 1000,
+                        end_ms: 12 * 60 * 60 * 1000
                     }]
                 },
                 {
@@ -77,8 +77,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame7',
                         title: 'Frame 7',
-                        start_seconds: 6 * 60 * 60 * 1000,
-                        end_seconds: 7 * 60 * 60 * 1000
+                        start_ms: 8 * 60 * 60 * 1000,
+                        end_ms: 10 * 60 * 60 * 1000
                     }]
                 },
                 {
@@ -87,8 +87,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame8',
                         title: 'Frame 8',
-                        start_seconds: 7 * 60 * 60 * 1000,
-                        end_seconds: 8 * 60 * 60 * 1000
+                        start_ms: 2 * 60 * 60 * 1000,
+                        end_ms: 6 * 60 * 60 * 1000
                     }]
                 },
                 {
@@ -97,8 +97,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame9',
                         title: 'Frame 9',
-                        start_seconds: 8 * 60 * 60 * 1000,
-                        end_seconds: 9 * 60 * 60 * 1000
+                        start_ms: 8 * 60 * 60 * 1000,
+                        end_ms: 9 * 60 * 60 * 1000
                     }]
                 },
                 {
@@ -107,8 +107,8 @@ import '../src/styles/basic-theme.css';
                     frames: [{
                         id: 'frame10',
                         title: 'Frame 10',
-                        start_seconds: 9 * 60 * 60 * 1000,
-                        end_seconds: 10 * 60 * 60 * 1000
+                        start_ms: 10 * 60 * 60 * 1000,
+                        end_ms: 12 * 60 * 60 * 1000
                     }]
                 }
             ]

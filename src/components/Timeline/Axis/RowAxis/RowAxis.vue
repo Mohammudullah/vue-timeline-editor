@@ -13,25 +13,24 @@ const props = withDefaults(defineProps<{
 </script>
 
 <template>
-    <div class="vtd__timeline-editor-row-axis">
+    <div class="vtd__row-axis">
         <div 
-            class="vtd__timeline-editor-row-axis-sections"
+            class="vtd__row-axis-sections"
         >
             <div 
-                class="vtd__timeline-editor-row-axis-section"
+                class="vtd__row-axis-section"
                 v-for="section in sections"
                 :key="section.id"
             >
                 <div
-                    class="vtd__timeline-editor-row-label"
+                    class="vtd__row-label"
                     :style="{
-                        width: rowLabelWidth + 'px',
                         height: rowHeight + 'px'
                     }"
                     v-for="row in section.rows"
                     :key="row.id"
                 >
-                    <span class="vtd__timeline-editor-row-label-text">
+                    <span class="vtd__row-label-text">
                         {{ row.title }}
                     </span>
                 </div>

@@ -5,9 +5,17 @@ import Row from './Row.vue';
 const props = withDefaults(defineProps<{
     rows: TimelineRowInterface[],
     rowHeight: number,
-    rowLabelWidth: number
+    rowLabelWidth: number,
+    colPixelPerMs: number,
+    rowPaddingLeft?: number,
+    rowPaddingRight?: number,
+    rowPaddingTop?: number,
+    rowPaddingBottom?: number,
 }>(), {
-   
+   rowPaddingBottom: 0,
+    rowPaddingLeft: 0,
+    rowPaddingRight: 0,
+    rowPaddingTop: 0
 })
 
 </script>
@@ -19,5 +27,10 @@ const props = withDefaults(defineProps<{
         :row="row"
         :height="props.rowHeight"
         :row-label-width="props.rowLabelWidth"
+        :padding-left="props.rowPaddingLeft"
+        :padding-right="props.rowPaddingRight"
+        :padding-top="props.rowPaddingTop"
+        :padding-bottom="props.rowPaddingBottom"
+        :pixel-per-ms="props.colPixelPerMs"
     />
 </template>

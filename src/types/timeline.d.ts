@@ -24,6 +24,6 @@ export interface TimelineRowInterface {
 export interface TimelineFrameInterface {
     id: string | number,
     title: string | null,
-    start_seconds: number,
-    end_seconds: number
+    start_ms: number,
+    end_ms: number
 }

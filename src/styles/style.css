@@ -1,12 +1,37 @@
 .vtd__timeline-container {
     display: flex;
+    flex-direction: column;
     overflow: hidden;
     position: relative;
 }
 
+.vtd__timeline-header {
+    display: flex;
+    flex-shrink: 0;
+}
+
+.vtd__timeline-header-spacer {
+    flex-shrink: 0;
+}
+
+.vtd__timeline-header-main {
+    flex: 1;
+    overflow: hidden;
+}
+
+.vtd__timeline-body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+}
+
+.vtd__timeline-y-axis-pane {
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
 .vtd__x-axis {
     overflow: hidden;
-    width: 100%;
     flex-shrink: 0;
     display: flex;
 }
@@ -29,35 +54,30 @@
     display: flex;
 }
 
-.vtd__timeline-editor-wrapper {
-    overflow-x: auto;
-    overflow-y: hidden;
-    display: flex;
-    flex-direction: column;
+.vtd__wrapper {
+    overflow: auto;
+    overscroll-behavior: none;
+    flex: 1;
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
 }
 
-.vtd__timeline-editor-wrapper::-webkit-scrollbar {
+.vtd__wrapper::-webkit-scrollbar {
     display: none;  /* Chrome, Safari and Opera */
-}
-
-.vtd__timeline-editor-wrapper-inner {
-    display: flex;
-    flex-shrink: 0;
-    overflow-y: auto;
-    align-items: flex-start;
-    height: 100%;
-    flex-shrink: 0;
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
-    position: relative;
 }
 
 .vtd__timeline-sections {
     flex-shrink: 0;
 }
 
-.vtd__timeline-editor-wrapper-inner::-webkit-scrollbar {
-    display: none;  /* Chrome, Safari and Opera */
+.vtd__area {
+    position: relative;
+}
+
+.vtd__row {
+    position: relative;
+}
+
+.vtd__row-frame-container {
+    position: absolute;
 }

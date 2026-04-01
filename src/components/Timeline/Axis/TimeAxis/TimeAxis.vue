@@ -23,14 +23,14 @@ const minorTicks = (majorTick: number): number[] => {
     }
 
     for (let i = 1; i < props.config.cols.minorGridsPerMajor; i++) {
-        ticks.push(majorTick + i * props.config.cols.minorGridInterval * 1000);
+        ticks.push(majorTick + i * props.config.cols.minorGridInterval);
     }
 
     return ticks;
 }
 
 const endSeconds = computed<number>(() => {
-    return props.config.range.end_seconds ? props.config.range.end_seconds : 24 * 60 * 60 * 1000;
+    return props.config.range.end_seconds ? (props.config.range.end_seconds * 1000) : (24 * 60 * 60 * 1000);
 })
 
 const majorTicks = computed<number[]>(() => {
@@ -41,16 +41,15 @@ const majorTicks = computed<number[]>(() => {
             break; // Stop if the next major tick exceeds the end of the timeline
         }
 
-        ticks.push(i * 1000); // Convert to milliseconds
+        ticks.push(i); // Convert to milliseconds
     }
 
-    console.log('majorTicks', ticks)
     return ticks;
 })
 
 
 const majorGridsWidth = computed<number>(() => {
-    return props.config.cols.gap * props.config.cols.minorGridsPerMajor;
+    return props.config.cols.width * props.config.cols.minorGridsPerMajor;
 })
 
 </script>
@@ -59,7 +58,9 @@ const majorGridsWidth = computed<number>(() => {
     <div 
         class="vtd__time-axis"
         :style="{
-            width: `${config.cols.totalPixels}px`
+            width: `${config.editor.width}px`,
+            paddingLeft: `${config.editor.paddingLeft}px`,
+            paddingRight: `${config.editor.paddingRight}px`,
         }"
     >
         <div 
@@ -73,7 +74,7 @@ const majorGridsWidth = computed<number>(() => {
             <div 
                 class="vtd__time-axis-major-tick-content"
                 :style="{
-                    width: `${config.cols.gap}px` 
+                    width: `${config.cols.width}px` 
                 }"
             >
                 <span 
@@ -93,7 +94,7 @@ const majorGridsWidth = computed<number>(() => {
             <MinorTicks
                 v-if="config.cols.minorGridInterval > 0" 
                 :ticks="minorTicks(tick)" 
-                :gridGap="config.cols.gap"
+                :gridGap="config.cols.width"
             />
         </div>
     </div>

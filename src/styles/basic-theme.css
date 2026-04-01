@@ -65,32 +65,62 @@
     padding-bottom: .1rem;
 }
 
+.vtd__timeline-header-spacer {
+    border-bottom: 1px solid rgb(238, 238, 238);
+    border-right: 1px solid rgb(238, 238, 238);
+}
+
 /**------------ Time Axis Styles End ---------------**/
 
 /**------------ Row Axis Styles Start ---------------**/
 
-.vtd__y-axis-row-axis {
-    position: fixed;
-    left: 0;
+.vtd__y-axis {
     background: white;
-    border-right: 1px solid rgb(238, 238, 238);
-    border-top: 1px solid rgb(238, 238, 238);
 }
 
-.vtd__timeline-editor-row-label {
+.vtd__row-label {
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: .75rem;
     font-weight: 500;
-    
+    border-right: 1px solid rgb(238, 238, 238);
+}
+
+.vtd__row-label:nth-child(odd) {
+    background-color: rgb(248, 248, 248);
 }
 
 /**------------ Row Axis Styles End ---------------**/
 
 
 /**------------ Row Styles Start ---------------**/
-.vtd__timeline-editor-row {
-    border-bottom: 1px solid rgb(238, 238, 238);
+
+.vtd__row:nth-child(odd) {
+    background-color: rgb(248, 248, 248);
 }
-/**------------ Row Styles End ---------------**/
+
+.vtd__row-frame-container {
+    height: 100%;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.vtd__row-frame {
+    background-color: rgb(238, 238, 238);
+    height: 100%;
+    padding: 10px;
+    border-radius: 6px;
+}
+
+.vtd__row-frame-title {
+    font-size: .75rem;
+    font-weight: 500;
+}
+
+.vtd__row-frame-time {
+    font-size: .75rem;
+    color: rgb(120, 120, 120);
+}
+
+/**------------ Row Styles End ---------------**/ 

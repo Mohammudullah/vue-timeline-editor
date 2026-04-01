@@ -6,8 +6,7 @@ export const useTimelineConfig = (
     {
         timelineContainer,
         timelineEditor,
-        scrollXEl,
-        scrollYEl,
+        scrollPaneEl,
         direction = 'horizontal',
         zoom = 1,
         colsLabelHeight = 40,
@@ -17,8 +16,7 @@ export const useTimelineConfig = (
     }: {
         timelineContainer: Ref<HTMLElement | null>,
         timelineEditor: Ref<HTMLElement | null>,
-        scrollXEl: Ref<HTMLElement | null>,
-        scrollYEl: Ref<HTMLElement | null>,
+        scrollPaneEl: Ref<HTMLElement | null>,
         direction?: 'horizontal' | 'vertical',
         zoom?: number,
         colsLabelHeight?: number,
@@ -34,25 +32,24 @@ export const useTimelineConfig = (
             height: 0,
         },
         editor: {
-            axis: {
-                x: {
-                    width: 0,
-                    viewPortWidth: 0,
-                    rawViewPortLeft: 0,
-                    rawViewPortRight: 0,
-                    viewPortLeft: 0,
-                    viewPortRight: 0,
-                },
-                y: {
-                    height: 0,
-                    viewPortHeight: 0,
-                    rawViewPortTop: 0,
-                    rawViewPortBottom: 0,
-                    viewPortTop: 0,
-                    viewPortBottom: 0,
-                }
-            },
+            width: 0,
+            viewPortWidth: 0,
+            rawViewPortLeft: 0,
+            rawViewPortRight: 0,
+            viewPortLeft: 0,
+            viewPortRight: 0,
+            
+            height: 0,
+            viewPortHeight: 0,
+            rawViewPortTop: 0,
+            rawViewPortBottom: 0,
+            viewPortTop: 0,
+            viewPortBottom: 0,
             viewPortRatio: 1,
+            
+            paddingLeft: 10,
+            paddingRight: 10,
+
             wrapper: {
                 width: 0,
                 height: 0,
@@ -61,16 +58,16 @@ export const useTimelineConfig = (
         direction,
         zoom,
         cols: {
-            majorGridInterval: 3600,
-            minorGridInterval: 900,
+            width: 10,
+            majorGridInterval: 3600000,
+            minorGridInterval: 900000,
             minorGridsPerMajor: 4,
-            gap: 10,
-            pixelPerSecond: 0,
+            pixelPerMs: 0,
             totalPixels: 0,
             labelHeight: colsLabelHeight,
         },
         rows: {
-            height: 100,
+            height: 60,
             labelWidth: rowsLabelWidth,
         },
         timeAxis: {
@@ -106,10 +103,10 @@ export const useTimelineConfig = (
      */
     const calculateMinorGrid = () => {
         const rules = [
-            [3600, 900], // ≥ 1h → 15m
-            [1800, 60],  // ≥ 30m → 1m
-            [600, 30],   // ≥ 10m → 30s
-            [60, 10],    // ≥ 1m → 10s
+            [3600000, 900000], // ≥ 1h → 15m in ms
+            [1800000, 60000],  // ≥ 30m → 1m in ms
+            [600000, 30000],   // ≥ 10m → 30s in ms
+            [60000, 10000],    // ≥ 1m → 10s in ms
         ];
 
         data.cols.minorGridInterval = rules.find(([threshold]) => data.cols.majorGridInterval >= threshold)?.[1] ?? 1;
@@ -131,9 +128,12 @@ export const useTimelineConfig = (
             [5, 40],
         ]
 
-        data.cols.gap = rules.find(([threshold]) => data.cols.minorGridsPerMajor >= threshold)?.[1] ?? 40;
-        data.cols.pixelPerSecond = data.cols.gap / data.cols.minorGridInterval;
-        data.cols.totalPixels = data.cols.pixelPerSecond * (data.range.end_seconds - data.range.start_seconds);
+        data.cols.width = rules.find(([threshold]) => data.cols.minorGridsPerMajor >= threshold)?.[1] ?? 40;
+        
+        data.cols.pixelPerMs = data.cols.width / data.cols.minorGridInterval;
+
+        //an integer value of total pixel in editor area
+        data.cols.totalPixels = Math.trunc(data.cols.pixelPerMs * ((data.range.end_seconds - data.range.start_seconds) * 1000));
     }
 
 
@@ -150,24 +150,24 @@ export const useTimelineConfig = (
 
         if(!data.container.width) return;
 
-        data.editor.axis.x.width = data.cols.totalPixels;
-        data.editor.axis.y.height = data.container.height;
+        data.editor.width = data.cols.totalPixels + data.editor.paddingLeft + data.editor.paddingRight;
+        data.editor.height = data.container.height;
 
-        data.editor.wrapper.width = data.editor.axis.x.width + data.rows.labelWidth;
-        data.editor.wrapper.height = data.editor.axis.y.height;
+        data.editor.wrapper.width = data.editor.width + data.rows.labelWidth;
+        data.editor.wrapper.height = data.editor.height;
     }
 
     //sync editor viewport size and position based on scroll or intersection observer
 
     const syncEditorViewPort = () => {
-        if (!timelineContainer.value || !timelineEditor.value || !scrollXEl.value || !scrollYEl.value) return;
+        if (!timelineContainer.value || !timelineEditor.value || !scrollPaneEl.value) return;
 
         const offsetX = editorOffsetFromContainer.value.left
         const offsetY = editorOffsetFromContainer.value.top
 
         // 🔹 Scroll positions
-        const scrollLeft = scrollXEl.value.scrollLeft
-        const scrollTop = scrollYEl.value.scrollTop
+        const scrollLeft = scrollPaneEl.value.scrollLeft
+        const scrollTop = scrollPaneEl.value.scrollTop
 
         // 🔹 Visible viewport (adjusted for axis labels)
         const viewPortWidth = timelineContainer.value.clientWidth - offsetX
@@ -189,26 +189,23 @@ export const useTimelineConfig = (
         const viewPortBottom = Math.min(editorHeight, rawTop + viewPortHeight)
 
         // 🔹 Assign
-        data.editor.axis.x.viewPortWidth = Math.max(0, viewPortRight - viewPortLeft)
-        data.editor.axis.y.viewPortHeight = Math.max(0, viewPortBottom - viewPortTop)
+        data.editor.viewPortWidth = Math.max(0, viewPortRight - viewPortLeft)
+        data.editor.viewPortHeight = Math.max(0, viewPortBottom - viewPortTop)
 
-        data.editor.axis.x.viewPortLeft = viewPortLeft
-        data.editor.axis.x.viewPortRight = viewPortRight
-        data.editor.axis.x.rawViewPortLeft = rawLeft
-        data.editor.axis.x.rawViewPortRight = rawLeft + viewPortWidth
+        data.editor.viewPortLeft = viewPortLeft
+        data.editor.viewPortRight = viewPortRight
+        data.editor.rawViewPortLeft = rawLeft
+        data.editor.rawViewPortRight = rawLeft + viewPortWidth
 
-        data.editor.axis.y.viewPortTop = viewPortTop
-        data.editor.axis.y.viewPortBottom = viewPortBottom
-        data.editor.axis.y.rawViewPortTop = rawTop
-        data.editor.axis.y.rawViewPortBottom = rawTop + viewPortHeight
-
-        data.editor.axis.y.viewPortTop = viewPortTop
-        data.editor.axis.y.viewPortBottom = viewPortBottom
+        data.editor.viewPortTop = viewPortTop
+        data.editor.viewPortBottom = viewPortBottom
+        data.editor.rawViewPortTop = rawTop
+        data.editor.rawViewPortBottom = rawTop + viewPortHeight
 
         // 🔹 Ratio
         const totalArea = editorWidth * editorHeight
         const visibleArea =
-            data.editor.axis.x.viewPortWidth * data.editor.axis.y.viewPortHeight
+            data.editor.viewPortWidth * data.editor.viewPortHeight
 
         data.editor.viewPortRatio =
             totalArea === 0 ? 0 : visibleArea / totalArea
@@ -246,11 +243,9 @@ export const useTimelineConfig = (
 
 
     //sync editor viewport on scroll
-    watch([scrollXEl, scrollYEl], ([newScrollXEl, newScrollYEl], [oldScrollXEl, oldScrollYEl]) => {
-        oldScrollXEl?.removeEventListener('scroll', syncEditorViewPort)
-        oldScrollYEl?.removeEventListener('scroll', syncEditorViewPort)
-        newScrollXEl?.addEventListener('scroll', syncEditorViewPort)
-        newScrollYEl?.addEventListener('scroll', syncEditorViewPort)
+    watch([scrollPaneEl], ([newScrollPaneEl], [oldScrollPaneEl]) => {
+        oldScrollPaneEl?.removeEventListener('scroll', syncEditorViewPort)
+        newScrollPaneEl?.addEventListener('scroll', syncEditorViewPort)
     }, { immediate: true })
 
     //sync editor viewport on offset change (for example, when label width changes)
@@ -265,24 +260,23 @@ export interface TimelineConfigInterface {
         height: number,
     },
     editor: {
-        axis: {
-            x: { 
-                width: number,
-                viewPortWidth: number,
-                rawViewPortLeft: number,
-                rawViewPortRight: number,
-                viewPortLeft: number,
-                viewPortRight: number,
-            },
-            y: {
-                height: number,
-                viewPortHeight: number,
-                rawViewPortTop: number,
-                rawViewPortBottom: number,
-                viewPortTop: number,
-                viewPortBottom: number,
-            }
-        }
+        width: number,
+        viewPortWidth: number,
+        rawViewPortLeft: number,
+        rawViewPortRight: number,
+        viewPortLeft: number,
+        viewPortRight: number,
+
+        height: number,
+        viewPortHeight: number,
+        rawViewPortTop: number,
+        rawViewPortBottom: number,
+        viewPortTop: number,
+        viewPortBottom: number,
+
+        paddingLeft: number,
+        paddingRight: number,
+
         viewPortRatio: number,
         wrapper: {
             width: number,
@@ -292,11 +286,11 @@ export interface TimelineConfigInterface {
     direction?: 'horizontal' | 'vertical',
     zoom?: number,
     cols: {
+        width: number,
         majorGridInterval: number,
         minorGridInterval: number,
         minorGridsPerMajor: number,
-        gap: number,
-        pixelPerSecond: number,
+        pixelPerMs: number,
         totalPixels: number,
         labelHeight: number,
     },
