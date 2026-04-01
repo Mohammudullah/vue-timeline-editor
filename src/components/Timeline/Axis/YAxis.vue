@@ -17,10 +17,15 @@ const props = withDefaults(defineProps<{
     <div class="vtd__y-axis" :style="{
         width: config.rows.labelWidth + 'px'
     }">
-        <RowAxis
-            :sections="timeline.sections"
-            :rowLabelWidth="config.rows.labelWidth"
-            :rowHeight="config.rows.height"
-        />
+        <div 
+            class="vtd__y-axis-row-axis"
+            
+        >
+            <RowAxis
+                :sections="timeline.sections"
+                :rowLabelWidth="config.rows.labelWidth"
+                :rowHeight="config.rows.height"
+            />
+        </div>
     </div>
 </template>

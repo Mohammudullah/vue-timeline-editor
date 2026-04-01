@@ -61,9 +61,3 @@
 .vtd__timeline-editor-wrapper-inner::-webkit-scrollbar {
     display: none;  /* Chrome, Safari and Opera */
 }
-
-.vtd__timeline-editor-row-axis {
-    position: sticky;
-    left: 0;
-    top: 0;
-} 

@@ -31,7 +31,9 @@ const props = withDefaults(defineProps<{
                     v-for="row in section.rows"
                     :key="row.id"
                 >
-                    {{ row.title }}
+                    <span class="vtd__timeline-editor-row-label-text">
+                        {{ row.title }}
+                    </span>
                 </div>
             </div>
         </div>

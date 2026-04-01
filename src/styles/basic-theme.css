@@ -68,10 +68,24 @@
 /**------------ Time Axis Styles End ---------------**/
 
 /**------------ Row Axis Styles Start ---------------**/
-.vtd__timeline-editor-row-axis {
-    position: sticky;
+
+.vtd__y-axis-row-axis {
+    position: fixed;
     left: 0;
+    background: white;
+    border-right: 1px solid rgb(238, 238, 238);
+    border-top: 1px solid rgb(238, 238, 238);
 }
+
+.vtd__timeline-editor-row-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: .75rem;
+    font-weight: 500;
+    
+}
+
 /**------------ Row Axis Styles End ---------------**/
 
 

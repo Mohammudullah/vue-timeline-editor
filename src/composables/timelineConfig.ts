@@ -1,4 +1,4 @@
-import { h, onBeforeUnmount, onMounted, reactive, Ref, toValue, watch } from "vue"
+import { computed, h, onBeforeUnmount, onMounted, reactive, Ref, toValue, watch } from "vue"
 import { TimeStringTimeFormatOptions } from "./utils"
 import { TimelineRangeArgInterface, TimelineRangeInterface } from "../types/timeline"
 
@@ -38,12 +38,16 @@ export const useTimelineConfig = (
                 x: {
                     width: 0,
                     viewPortWidth: 0,
+                    rawViewPortLeft: 0,
+                    rawViewPortRight: 0,
                     viewPortLeft: 0,
                     viewPortRight: 0,
                 },
                 y: {
                     height: 0,
                     viewPortHeight: 0,
+                    rawViewPortTop: 0,
+                    rawViewPortBottom: 0,
                     viewPortTop: 0,
                     viewPortBottom: 0,
                 }
@@ -73,6 +77,17 @@ export const useTimelineConfig = (
             timeFormat: timeAxisTimeFormat,
         },
         range: { start_seconds: 0, end_seconds: 24 * 60 * 60 }
+    })
+
+
+    const editorOffsetFromContainer = computed<{
+        left: number,
+        top: number,
+    }>(() => {
+        return {
+            left: data.rows.labelWidth,
+            top: data.cols.labelHeight,
+        }
     })
 
 
@@ -145,34 +160,47 @@ export const useTimelineConfig = (
     //sync editor viewport size and position based on scroll or intersection observer
 
     const syncEditorViewPort = () => {
+        if (!timelineContainer.value || !timelineEditor.value || !scrollXEl.value || !scrollYEl.value) return;
 
-        if(!timelineContainer.value || !timelineEditor.value || !scrollXEl.value || !scrollYEl.value) return;
+        const offsetX = editorOffsetFromContainer.value.left
+        const offsetY = editorOffsetFromContainer.value.top
 
-        // Scroll positions
+        // 🔹 Scroll positions
         const scrollLeft = scrollXEl.value.scrollLeft
         const scrollTop = scrollYEl.value.scrollTop
 
-        // Visible viewport size (contain1er)
-        const viewPortWidth = timelineContainer.value.clientWidth
-        const viewPortHeight = timelineContainer.value.clientHeight
+        // 🔹 Visible viewport (adjusted for axis labels)
+        const viewPortWidth = timelineContainer.value.clientWidth - offsetX
+        const viewPortHeight = timelineContainer.value.clientHeight - offsetY
 
-        // Editor total size
+        // Editor size
         const editorWidth = timelineEditor.value.scrollWidth
         const editorHeight = timelineEditor.value.scrollHeight
 
-        // Calculate visible range inside editor
-        const viewPortLeft = scrollLeft
-        const viewPortRight = Math.min(editorWidth, scrollLeft + viewPortWidth)
+        // use RAW positions (with offset)
+        const rawLeft = scrollLeft - offsetX
+        const rawTop = scrollTop - offsetY
 
-        const viewPortTop = scrollTop
-        const viewPortBottom = Math.min(editorHeight, scrollTop + viewPortHeight)
+        // 🔹 Clamp only final values
+        const viewPortLeft = Math.max(0, rawLeft)
+        const viewPortTop = Math.max(0, rawTop)
 
-        // Final assignment
-        data.editor.axis.x.viewPortWidth = viewPortRight - viewPortLeft
-        data.editor.axis.y.viewPortHeight = viewPortBottom - viewPortTop
+        const viewPortRight = Math.min(editorWidth, rawLeft + viewPortWidth)
+        const viewPortBottom = Math.min(editorHeight, rawTop + viewPortHeight)
+
+        // 🔹 Assign
+        data.editor.axis.x.viewPortWidth = Math.max(0, viewPortRight - viewPortLeft)
+        data.editor.axis.y.viewPortHeight = Math.max(0, viewPortBottom - viewPortTop)
 
         data.editor.axis.x.viewPortLeft = viewPortLeft
         data.editor.axis.x.viewPortRight = viewPortRight
+        data.editor.axis.x.rawViewPortLeft = rawLeft
+        data.editor.axis.x.rawViewPortRight = rawLeft + viewPortWidth
+
+        data.editor.axis.y.viewPortTop = viewPortTop
+        data.editor.axis.y.viewPortBottom = viewPortBottom
+        data.editor.axis.y.rawViewPortTop = rawTop
+        data.editor.axis.y.rawViewPortBottom = rawTop + viewPortHeight
 
         data.editor.axis.y.viewPortTop = viewPortTop
         data.editor.axis.y.viewPortBottom = viewPortBottom
@@ -183,7 +211,7 @@ export const useTimelineConfig = (
             data.editor.axis.x.viewPortWidth * data.editor.axis.y.viewPortHeight
 
         data.editor.viewPortRatio =
-        totalArea === 0 ? 0 : visibleArea / totalArea
+            totalArea === 0 ? 0 : visibleArea / totalArea
     }
 
     watch(timelineContainer, updateContainerSize, { immediate: true })
@@ -225,6 +253,9 @@ export const useTimelineConfig = (
         newScrollYEl?.addEventListener('scroll', syncEditorViewPort)
     }, { immediate: true })
 
+    //sync editor viewport on offset change (for example, when label width changes)
+    watch(editorOffsetFromContainer, syncEditorViewPort)
+
     return data
 }
 
@@ -238,12 +269,16 @@ export interface TimelineConfigInterface {
             x: { 
                 width: number,
                 viewPortWidth: number,
+                rawViewPortLeft: number,
+                rawViewPortRight: number,
                 viewPortLeft: number,
                 viewPortRight: number,
             },
             y: {
                 height: number,
                 viewPortHeight: number,
+                rawViewPortTop: number,
+                rawViewPortBottom: number,
                 viewPortTop: number,
                 viewPortBottom: number,
             }

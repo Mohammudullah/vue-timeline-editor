@@ -119,4 +119,6 @@ onMounted(() => {
             </div>
         </div>
     </div>
+
+    {{ timelineConfig }}
 </template>
