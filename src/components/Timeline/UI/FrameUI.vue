@@ -38,6 +38,7 @@ const emits = defineEmits<{
     >
         <div 
             class="vtd__row-frame"
+            style="touch-action: none;"
             @pointerdown="$emit('pointerdown', $event)"
             @pointermove="$emit('pointermove', $event)"
             @pointerup="$emit('pointerup', $event)"

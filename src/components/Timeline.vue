@@ -47,6 +47,9 @@ const timelineConfig = useTimelineConfig({
 
 const timeline = useTimeline({
     config: timelineConfig,
+    container: timelineContainer,
+    editor: timelineEditor,
+    scrollPaneEl: scrollPaneEl,
     sections: () => props.sections,
 });
 
@@ -128,7 +131,7 @@ onMounted(() => {
                 ref="scrollPaneEl"
             >
                 <div
-                    class="vtd__area"
+                    class="vtd__timeline-editor-area"
                     ref="timelineEditor"
                     :style="{
                         width: timelineConfig.editor.width + 'px',

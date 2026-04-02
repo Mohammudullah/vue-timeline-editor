@@ -26,6 +26,9 @@ const emits = defineEmits<{
     'mouseleave': [frame: TimelineFrameInterface, event: MouseEvent],
 }>()
 
+//render a uuid to identify this component
+const uuid = crypto.randomUUID();
+
 const position = computed<{ left: number; width: number }>(() => ({
         left: (props.frame.start_ms * props.pixelPerMs) + props.offsetLeft,
         width: (props.frame.end_ms - props.frame.start_ms) * props.pixelPerMs
@@ -36,7 +39,7 @@ const position = computed<{ left: number; width: number }>(() => ({
 const framePress = usePointerPress({
     onClick: (event) => emits('click', props.frame, event),
     onDoubleClick: (event) => emits('dblclick', props.frame, event),
-    onHoldStart: (event) => props.dnd?.onDragStart(event) ,
+    onHoldStart: (event) => props.dnd?.onDragStart(event, props.frame, uuid),
     onHoldEnd: (event) => props.dnd?.onDragEnd(event),
 })
 
@@ -51,7 +54,7 @@ const framePress = usePointerPress({
         @pointermove="framePress.onPointermove"
         @pointerup="framePress.onPointerup"
         @pointercancel="framePress.onPointercancel"
-        @contextmenu="(event) => emits('contextmenu', frame, event)"
+        @contextmenu.prevent="(event) => emits('contextmenu', frame, event)"
         @mouseenter="(event) => emits('mouseenter', frame, event)"
         @mouseleave="(event) => emits('mouseleave', frame, event)"
     >

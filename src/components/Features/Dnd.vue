@@ -4,7 +4,6 @@ import { TimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
 import { useDnd } from '../../composables/features/dnd';
-import Frame from '../Timeline/Section/Frames/Frame.vue';
 
 
 const timeline = inject<TimelineInterface>('timeline');
@@ -19,9 +18,7 @@ if(features.data.dnd) {
     throw new Error('Dnd feature is already enabled. Please check if <Dnd/> is mounted multiple times.');
 }
 
-setTimeout(() => {
-    features.initFeature('dnd', useDnd);
-}, 1000);
+features.initFeature('dnd', () => useDnd({ timeline, timelineConfig }));
 
 onUnmounted(() => {
     features.destroyFeature('dnd');

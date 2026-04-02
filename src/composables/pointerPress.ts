@@ -72,6 +72,7 @@ export const usePointerPress = (
     };
 
     const onPointerdown = (event: PointerEvent) => {
+
         if (!event.isPrimary || event.button !== 0) return;
 
         activePointerId = event.pointerId;
