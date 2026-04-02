@@ -5,14 +5,29 @@
     "author": "Mohammadullah",
     "license": "MIT",
     "type": "module",
-    "main": "dist/index.cjs.js",
-    "module": "dist/index.es.js",
+    "main": "dist/index.cjs",
+    "module": "dist/index.js",
     "types": "dist/index.d.ts",
     "exports": {
         ".": {
-            "import": "./dist/index.es.js",
-            "require": "./dist/index.cjs.js",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs",
             "types": "./dist/index.d.ts"
+        },
+        "./timeline": {
+            "import": "./dist/timeline.js",
+            "require": "./dist/timeline.cjs",
+            "types": "./dist/timeline.d.ts"
+        },
+        "./features/frame-dnd": {
+            "import": "./dist/features/frame-dnd.js",
+            "require": "./dist/features/frame-dnd.cjs",
+            "types": "./dist/features/frame-dnd.d.ts"
+        },
+        "./features/use-snapping": {
+            "import": "./dist/features/use-snapping.js",
+            "require": "./dist/features/use-snapping.cjs",
+            "types": "./dist/features/use-snapping.d.ts"
         },
         "./basic-theme.css": "./dist/basic-theme.css"
     },

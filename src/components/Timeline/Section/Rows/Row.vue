@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { UseDndType } from '../../../../composables/features/dnd';
 import { TimelineRowInterface } from '../../../../types/timeline';
 import Frame from '../Frames/Frame.vue';
 
@@ -11,7 +12,8 @@ const props = withDefaults(defineProps<{
     paddingLeft?: number
     paddingRight?: number
     paddingTop?: number
-    paddingBottom?: number
+    paddingBottom?: number,
+    dnd: UseDndType | null,
 }>(), {
     paddingBottom: 0,
     paddingLeft: 0,
@@ -37,6 +39,7 @@ const props = withDefaults(defineProps<{
             :key="frame.id"
             :frame="frame"
             :offsetLeft="paddingLeft"
+            :dnd="dnd"
          />
     </div>
 </template>

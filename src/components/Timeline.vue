@@ -10,6 +10,7 @@ import { TimeStringTimeFormatOptions } from '../composables/utils';
 import YAxis from './Timeline/Axis/YAxis.vue';
 import Section from './Timeline/Section/Section.vue';
 import usePointerPress from '../composables/pointerPress';
+import { useFeatures } from '../composables/features/features';
 
 
 const props = withDefaults(defineProps<{
@@ -49,8 +50,11 @@ const timeline = useTimeline({
     sections: () => props.sections,
 });
 
+const features = useFeatures();
+
 provide('timeline', timeline);
 provide('timelineConfig', timelineConfig);
+provide('features', features);
 
 const onTimelineScroll = (event: Event) => {
     const target = event.target as HTMLDivElement | null;
@@ -148,4 +152,6 @@ onMounted(() => {
     </div>
 
     <slot></slot>
+
+    {{ features.data.dnd }}
 </template>

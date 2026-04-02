@@ -6,7 +6,7 @@ export const usePointerPress = (
     {
         onClick,
         onDoubleClick,
-        onHold,
+        onHoldStart,
         onHoldEnd,
         holdDelay = 500,
         doubleClickDelay = 250,
@@ -14,7 +14,7 @@ export const usePointerPress = (
     }: {
         onClick?: PointerPressHandler,
         onDoubleClick?: PointerPressHandler,
-        onHold?: PointerPressHandler,
+        onHoldStart?: PointerPressHandler,
         onHoldEnd?: PointerPressHandler,
         holdDelay?: number,
         doubleClickDelay?: number,
@@ -88,12 +88,12 @@ export const usePointerPress = (
             if (activePointerId !== event.pointerId || moved || holdTriggered) return;
 
             holdTriggered = true;
-            onHold?.(event);
+            onHoldStart?.(event);
         }, holdDelay);
     };
 
     const onPointermove = (event: PointerEvent) => {
-        if (event.pointerId !== activePointerId || moved) return;
+        if (event.pointerId !== activePointerId || moved || holdTriggered) return;
 
         if (!hasMoved(event)) return;
 

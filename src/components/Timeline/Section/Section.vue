@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { inject } from 'vue';
+import { FeaturesInterface, UseFeaturesType } from '../../../composables/features/features';
 import { TimelineInterface } from '../../../composables/timeline';
 import { TimelineConfigInterface } from '../../../composables/timelineConfig';
 import { TimelineSectionInterface } from '../../../types/timeline';
@@ -12,6 +14,8 @@ const props = withDefaults(defineProps<{
    
 })
 
+const features = inject<UseFeaturesType>('features');
+
 </script>
 <template>
     <div class="vtd__timeline-section">
@@ -23,6 +27,7 @@ const props = withDefaults(defineProps<{
                 :row-padding-left="config.editor.paddingLeft"
                 :rows="section.rows"
                 :col-pixel-per-ms="config.cols.pixelPerMs"
+                :dnd="features?.data.dnd || null"
             />
         </div>
     </div>

@@ -1,3 +1,3 @@
-export { default as Timeline } from './components/Timeline.vue'
-export { default as FrameDnd } from './components/Features/FrameDnd.vue'
-export { default as UseSnapping } from './components/Features/UseSnapping.vue'
+export { default as Timeline } from './timeline'
+export { default as FrameDnd } from './features/frame-dnd'
+export { default as UseSnapping } from './features/use-snapping'

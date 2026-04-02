@@ -10,5 +10,4 @@ const timelineConfig = inject<TimelineConfigInterface>('timelineConfig');
 </script>
 
 <template>
-{{ timelineConfig }}
 </template>

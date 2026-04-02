@@ -10,33 +10,74 @@ const __dirname = path.dirname(__filename)
 
 export default defineConfig(({ command }) => ({
 
-    plugins: [vue(), cssInjectedByJsPlugin()],
+    plugins: [
+        vue(),
+        cssInjectedByJsPlugin({
+            jsAssetsFilterFunction: (outputChunk) => {
+                return outputChunk.fileName === 'timeline.js' || outputChunk.fileName === 'timeline.cjs'
+            }
+        })
+    ],
 
     root: command === 'serve' ? 'playground' : '.',
 
     resolve: {
-        alias: {
-            '@': path.resolve(__dirname, 'src'),
-            'vue-timeline-editor': path.resolve(__dirname, 'dist/index.es.js')
-        }
+        alias: [
+            {
+                find: 'vue-timeline-editor/features/frame-dnd',
+                replacement: path.resolve(__dirname, 'dist/features/frame-dnd.js')
+            },
+            {
+                find: 'vue-timeline-editor/features/use-snapping',
+                replacement: path.resolve(__dirname, 'dist/features/use-snapping.js')
+            },
+            {
+                find: 'vue-timeline-editor/timeline',
+                replacement: path.resolve(__dirname, 'dist/timeline.js')
+            },
+            {
+                find: 'vue-timeline-editor',
+                replacement: path.resolve(__dirname, 'dist/index.js')
+            },
+            {
+                find: '@',
+                replacement: path.resolve(__dirname, 'src')
+            }
+        ]
     },
 
     build: {
         lib: {
             entry: {
                 index: 'src/index.ts',
+                timeline: 'src/timeline.ts',
+                'features/frame-dnd': 'src/features/frame-dnd.ts',
+                'features/use-snapping': 'src/features/use-snapping.ts',
             },
             name: 'VueTimelineEditor',
-            fileName: (format, entryName) => `${entryName}.${format}.js`
         },
 
         rollupOptions: {
             external: ['vue'],
-            output: {
-                globals: {
-                    vue: 'Vue'
+            output: [
+                {
+                    format: 'es',
+                    globals: {
+                        vue: 'Vue'
+                    },
+                    entryFileNames: '[name].js',
+                    chunkFileNames: 'chunks/[name]-[hash].js'
+                },
+                {
+                    format: 'cjs',
+                    globals: {
+                        vue: 'Vue'
+                    },
+                    exports: 'named',
+                    entryFileNames: '[name].cjs',
+                    chunkFileNames: 'chunks/[name]-[hash].cjs'
                 }
-            }
+            ]
         }
     }
 }))

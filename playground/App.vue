@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import FrameDnd from '../src/components/Features/FrameDnd.vue';
+import Dnd from '../src/components/Features/Dnd.vue';
 import UseSnapping from '../src/components/Features/UseSnapping.vue';
 import Timeline from '../src/components/Timeline.vue';
 import '../src/styles/basic-theme.css';
@@ -116,7 +116,7 @@ import '../src/styles/basic-theme.css';
             ]
         }]"
     >
-        <FrameDnd/>
+        <Dnd/>
         <UseSnapping/>
     </Timeline>
 </template>
