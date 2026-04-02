@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, provide, ref } from 'vue';
 import { TimelineInterface, useTimeline } from '../composables/timeline';
 import { TimelineRangeArgInterface, TimelineSectionInterface } from '../types/timeline';
 import { TimelineConfigInterface, useTimelineConfig } from '../composables/timelineConfig';
@@ -9,6 +9,7 @@ import '../styles/style.css';
 import { TimeStringTimeFormatOptions } from '../composables/utils';
 import YAxis from './Timeline/Axis/YAxis.vue';
 import Section from './Timeline/Section/Section.vue';
+import usePointerPress from '../composables/pointerPress';
 
 
 const props = withDefaults(defineProps<{
@@ -47,6 +48,9 @@ const timeline = useTimeline({
     config: timelineConfig,
     sections: () => props.sections,
 });
+
+provide('timeline', timeline);
+provide('timelineConfig', timelineConfig);
 
 const onTimelineScroll = (event: Event) => {
     const target = event.target as HTMLDivElement | null;
@@ -143,5 +147,5 @@ onMounted(() => {
         </div>
     </div>
 
-    {{ timelineConfig }}
+    <slot></slot>
 </template>

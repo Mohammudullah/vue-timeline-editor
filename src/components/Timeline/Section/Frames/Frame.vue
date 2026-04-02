@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { TimelineFrameInterface } from '../../../../types/timeline';
 import useUtils from '../../../../composables/utils';
+import usePointerPress from '../../../../composables/pointerPress';
 
 
 const props = withDefaults(defineProps<{
@@ -33,6 +34,13 @@ const position = computed<{ left: number; width: number }>(() => ({
     })
 )
 
+const framePress = usePointerPress({
+    onClick: (event) => emits('click', props.frame, event),
+    onDoubleClick: (event) => emits('dblclick', props.frame, event),
+    onHold: (event) => emits('hold', props.frame, event),
+    onHoldEnd: (event) => emits('holdend', props.frame, event),
+})
+
 </script>
 
 <template>
@@ -45,12 +53,13 @@ const position = computed<{ left: number; width: number }>(() => ({
     >
         <div 
             class="vtd__row-frame"
+            @pointerdown="framePress.onPointerdown"
+            @pointermove="framePress.onPointermove"
+            @pointerup="framePress.onPointerup"
+            @pointercancel="framePress.onPointercancel"
             @contextmenu="(event) => emits('contextmenu', props.frame, event)"
             @mouseenter="(event) => emits('mouseenter', props.frame, event)"
             @mouseleave="(event) => emits('mouseleave', props.frame, event)"
-            @drag="(event) => emits('drag', props.frame, event)"
-            @dragend="(event) => emits('dragend', props.frame, event)"
-            @dragstart="(event) => emits('dragstart', props.frame, event)"
         >
             <div class="vtd__row-frame-title">
                 {{ frame.title }}

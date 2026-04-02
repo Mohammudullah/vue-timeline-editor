@@ -14,11 +14,6 @@
             "require": "./dist/index.cjs.js",
             "types": "./dist/index.d.ts"
         },
-        "./features": {
-            "import": "./dist/features.es.js",
-            "require": "./dist/features.cjs.js",
-            "types": "./dist/features/index.d.ts"
-        },
         "./basic-theme.css": "./dist/basic-theme.css"
     },
     "files": [

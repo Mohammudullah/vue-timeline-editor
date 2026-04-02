@@ -22,6 +22,8 @@
     margin: 0;
     padding: 0;
     line-height: normal;
+    user-select: none;
+    
 }
 
 /**------------ Global Styles End ---------------**/

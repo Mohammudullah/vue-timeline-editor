@@ -25,7 +25,6 @@ export default defineConfig(({ command }) => ({
         lib: {
             entry: {
                 index: 'src/index.ts',
-                features: 'src/features/index.ts'
             },
             name: 'VueTimelineEditor',
             fileName: (format, entryName) => `${entryName}.${format}.js`
