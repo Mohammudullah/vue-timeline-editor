@@ -116,7 +116,7 @@ import '../src/styles/basic-theme.css';
             ]
         }]"
     >
-        <FrameDnD/>
+        <FrameDnd/>
         <UseSnapping/>
     </Timeline>
 </template>
