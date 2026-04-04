@@ -4,6 +4,7 @@ import { TimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
 import { useDnd } from '../../composables/features/dnd';
+import FrameUI from '../Timeline/UI/FrameUI.vue';
 
 
 const timeline = inject<TimelineInterface>('timeline');
@@ -28,17 +29,10 @@ onUnmounted(() => {
 
 <template>
 
-    {{ features.data.dnd }}
-
-    <button
-        @click="features.destroyFeature('dnd')"
-    >
-        {{ features.data.dnd ? 'Disable Dnd' : 'Enable Dnd' }}
-    </button>
-
     <div>
-        <!-- <Frame
-            :
+        <!-- <FrameUI
+            :left="features.data.dnd?.state.pointer.clientX"
+            :width=""
         /> -->
     </div>
 </template>

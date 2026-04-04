@@ -1,13 +1,31 @@
 <script setup lang="ts">
-import { TimelineSectionInterface } from '../../../../types/timeline';
+import { computed } from 'vue';
+import { TimelineRowByUuidInterface, TimelineSectionByUuidInterface, TimelineSectionInterface } from '../../../../types/timeline';
 
 
 const props = withDefaults(defineProps<{
-    sections: TimelineSectionInterface[],
+    sections: Record<string | number, TimelineSectionByUuidInterface>,
+    rows: Record<string | number, TimelineRowByUuidInterface>,
     rowLabelWidth: number,
     rowHeight: number
 }>(), {
     
+})
+
+const rowGroupedBySection = computed<Record<string | number, TimelineRowByUuidInterface[]>>(() => {
+    const grouped: Record<string | number, TimelineRowByUuidInterface[]> = {};
+
+    Object.values(props.sections).forEach(section => {
+        grouped[section.uuid] = [];
+
+        Object.values(props.rows).forEach(row => {
+            if(row.sectionUuid === section.uuid) {
+                grouped[section.uuid].push(row);
+            }
+        })
+    })
+
+    return grouped;
 })
 
 </script>
@@ -20,15 +38,15 @@ const props = withDefaults(defineProps<{
             <div 
                 class="vtd__row-axis-section"
                 v-for="section in sections"
-                :key="section.id"
+                :key="section.uuid"
             >
                 <div
                     class="vtd__row-label"
                     :style="{
                         height: rowHeight + 'px'
                     }"
-                    v-for="row in section.rows"
-                    :key="row.id"
+                    v-for="row in rowGroupedBySection[section.uuid]"
+                    :key="row.uuid"
                 >
                     <span class="vtd__row-label-text">
                         {{ row.title }}

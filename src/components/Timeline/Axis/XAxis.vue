@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { TimelineInterface } from '../../../composables/timeline';
+import { TimelineInterface, UseTimelineInterface } from '../../../composables/timeline';
 import { TimelineConfigInterface } from '../../../composables/timelineConfig';
 import TimeAxis from './TimeAxis/TimeAxis.vue';
 
 
 const props = withDefaults(defineProps<{
     config: TimelineConfigInterface,
-    timeline: TimelineInterface
+    timeline: UseTimelineInterface
 }>(), {
     
 })

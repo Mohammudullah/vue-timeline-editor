@@ -1,7 +1,9 @@
-import { onBeforeUnmount, onMounted, reactive, Reactive, Ref, watch } from "vue"
+import { onBeforeUnmount, reactive, Reactive, watch } from "vue"
 import { TimelineFrameInterface } from "../../types/timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
 import { TimelineInterface } from "../timeline";
+import { PointerPressControls } from "../pointerPress";
+import { clear } from "node:console";
 
 export const useDnd = ({
     timeline,
@@ -11,6 +13,13 @@ export const useDnd = ({
     timelineConfig: TimelineConfigInterface
 
 }) : Reactive<DndInterface> => {
+
+    let currentFrameContainer: HTMLDivElement | null = null;
+
+    // The pointer controls first starts on frame then is transferred to the dnd
+    // so, we store frame pointer controls here to call onHoldEnd when drag ends
+    let pointerControls: PointerPressControls | null = null;
+
     const state = reactive<DndStateInterface>({
         dragging: false,
         draggingFrame: null,
@@ -24,42 +33,48 @@ export const useDnd = ({
     });
 
 
-    const onDragStart = (event: PointerEvent, frame: TimelineFrameInterface, uuid: string) => {
+    const startDrag = (event: PointerEvent, controls: PointerPressControls, frame: TimelineFrameInterface, container: HTMLDivElement | null, uuid: string | number) => {
+
+        event.preventDefault();
+
+        currentFrameContainer = container;
+
+        controls.takeover();
+        pointerControls = controls;
+
         state.dragging = true;
         state.draggingFrame = frame;
         state.draggingUuid = uuid;
 
         if(timeline.editor) {
-            // timeline.editor.style.touchAction = 'none';
+
+            if(!timeline.editor.hasPointerCapture?.(event.pointerId)) {
+                timeline.editor.setPointerCapture(event.pointerId);
+            }
         }
     }
 
-    const onDragEnd = (event: PointerEvent) => {
+    const dragEnd = (event: PointerEvent) => {
+        if(!state.dragging) return;
+
+        pointerControls?.onHoldEnd(event);
+        pointerControls = null;
+
         state.dragging = false;
         state.draggingFrame = null;
         state.draggingUuid = null;
 
         if(timeline.editor) {
-            timeline.editor.style.touchAction = 'auto';
+
+            if(timeline.editor?.hasPointerCapture?.(event.pointerId)) {
+                timeline.editor.releasePointerCapture(event.pointerId);
+            }
         }
     }
 
-    const setEditorPointerCapture = (event: PointerEvent) => {
-
-        if (!timeline.editor) return;
-
-        timeline.editor.setPointerCapture(event.pointerId);
-    
-    }
-
-    const releaseEditorPointerCapture = (event: PointerEvent) => {
-
-        if (!timeline.editor) return;
-        
-        timeline.editor.releasePointerCapture(event.pointerId);
-    }
-
     const onPointerMove = (event: PointerEvent) => {
+        if(!state.dragging) return;
+
         state.pointer.clientX = event.clientX;
         state.pointer.clientY = event.clientY;
 
@@ -69,8 +84,8 @@ export const useDnd = ({
     
     const editorPointerEvents = {
         'pointermove': onPointerMove,
-        'pointerdown': setEditorPointerCapture,
-        'pointerup': releaseEditorPointerCapture,
+        'pointerup': dragEnd,
+        'pointercancel': dragEnd,
     } as const;
 
     type eventTypes = keyof typeof editorPointerEvents;
@@ -101,8 +116,7 @@ export const useDnd = ({
 
     return {
         state,
-        onDragStart,
-        onDragEnd
+        startDrag,
     };
 }
 
@@ -110,14 +124,13 @@ export type UseDndType = ReturnType<typeof useDnd>;
 
 export interface DndInterface {
     state: DndStateInterface,
-    onDragStart: (event: PointerEvent, frame: TimelineFrameInterface, uuid: string) => void,
-    onDragEnd: (event: PointerEvent) => void
+    startDrag: (event: PointerEvent, controls: PointerPressControls, frame: TimelineFrameInterface, container: HTMLDivElement | null, uuid: string | number ) => void,
 }
 
 export interface DndStateInterface {
     dragging: boolean,
     draggingFrame: null | TimelineFrameInterface,
-    draggingUuid: null | string,
+    draggingUuid: null | string | number,
     pointer: {
         clientX: number,
         clientY: number,

@@ -1,12 +1,28 @@
 import { reactive } from "vue";
 import { UseDndType } from "./dnd";
 import { SnappingInterface } from "./snapping";
+import { useFrames, UseFrameInterface } from "./frame";
+import { TimelineInterface, UseTimelineInterface } from "../timeline";
+import { TimelineConfigInterface } from "../timelineConfig";
 
-export const useFeatures = () => {
+export const useFeatures = ({
+    timeline,
+    timelineConfig,
+}: {
+    timeline: UseTimelineInterface,
+    timelineConfig: TimelineConfigInterface,
+}) => {
+
+    //init default and required features here,
+    const frame = useFrames({
+        timeline,
+        timelineConfig,
+    }); 
 
     const features = reactive<FeaturesInterface>({
-        dnd: null as UseDndType | null,
-        snapping: null as SnappingInterface | null
+        dnd: null,
+        snapping: null,
+        frame,
     });
 
     const initFeature = (
@@ -44,10 +60,11 @@ export const useFeatures = () => {
 };
 
 export interface FeaturesInterface {
+    frame: UseFrameInterface,
     dnd: UseDndType | null,
-    snapping: SnappingInterface | null
+    snapping: SnappingInterface | null,
 }
 
 export type UseFeaturesType = ReturnType<typeof useFeatures>;
 
-export type InitFeatureType = UseDndType | SnappingInterface;
+export type InitFeatureType = UseDndType | SnappingInterface | UseFrameInterface;

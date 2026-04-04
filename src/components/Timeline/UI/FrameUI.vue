@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { ref } from 'vue';
 import useUtils from '../../../composables/utils';
 import { TimelineFrameInterface } from '../../../types/timeline';
 
@@ -14,6 +15,8 @@ const props = withDefaults(defineProps<{
 
 const { secondsToTimeString } = useUtils()
 
+const container = ref<HTMLDivElement | null>(null);
+
 
 const emits = defineEmits<{
     'pointerdown': [value: PointerEvent],
@@ -26,20 +29,25 @@ const emits = defineEmits<{
 }>()
 
 
+defineExpose({
+    container
+})
+
+
 </script>
 
 <template>
     <div
         class="vtd__row-frame-container"
+        ref="container"
         :style="{
             left: left + 'px',
-            width: width + 'px'
+            width: width + 'px',
         }"
     >
         <div 
             class="vtd__row-frame"
-            style="touch-action: none;"
-            @pointerdown="$emit('pointerdown', $event)"
+            @pointerdown.prevent="$emit('pointerdown', $event)"
             @pointermove="$emit('pointermove', $event)"
             @pointerup="$emit('pointerup', $event)"
             @pointercancel="$emit('pointercancel', $event)"

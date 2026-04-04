@@ -1,6 +1,12 @@
 import { onBeforeUnmount } from 'vue';
 
 type PointerPressHandler = (event: PointerEvent) => void;
+type PointerPressHoldStartHandler = (event: PointerEvent, controls: PointerPressControls) => void;
+
+export interface PointerPressControls {
+    takeover: () => void,
+    onHoldEnd: (event: PointerEvent) => void,
+}
 
 export const usePointerPress = (
     {
@@ -14,7 +20,7 @@ export const usePointerPress = (
     }: {
         onClick?: PointerPressHandler,
         onDoubleClick?: PointerPressHandler,
-        onHoldStart?: PointerPressHandler,
+        onHoldStart?: PointerPressHoldStartHandler,
         onHoldEnd?: PointerPressHandler,
         holdDelay?: number,
         doubleClickDelay?: number,
@@ -32,6 +38,7 @@ export const usePointerPress = (
     let pendingClickTarget: EventTarget | null = null;
     let pendingPointerType: string | null = null;
     let pendingButton: number | null = null;
+    let ownershipTransferred = false;
 
     const clearHoldTimer = () => {
         if (!holdTimer) return;
@@ -57,6 +64,7 @@ export const usePointerPress = (
         activePointerId = null;
         moved = false;
         holdTriggered = false;
+        ownershipTransferred = false;
     };
 
     const hasMoved = (event: PointerEvent) => {
@@ -71,6 +79,16 @@ export const usePointerPress = (
         target.releasePointerCapture(event.pointerId);
     };
 
+    const finalizeTakeover = (event: PointerEvent) => {
+        ownershipTransferred = true;
+        clearHoldTimer();
+        clearPendingClick();
+        releasePointerCapture(event);
+        activePointerId = null;
+        moved = false;
+        holdTriggered = false;
+    };
+
     const onPointerdown = (event: PointerEvent) => {
 
         if (!event.isPrimary || event.button !== 0) return;
@@ -80,6 +98,7 @@ export const usePointerPress = (
         startY = event.clientY;
         moved = false;
         holdTriggered = false;
+        ownershipTransferred = false;
 
         const target = event.currentTarget as HTMLElement | null;
         target?.setPointerCapture?.(event.pointerId);
@@ -89,7 +108,12 @@ export const usePointerPress = (
             if (activePointerId !== event.pointerId || moved || holdTriggered) return;
 
             holdTriggered = true;
-            onHoldStart?.(event);
+            onHoldStart?.(event, {
+                takeover: () => finalizeTakeover(event),
+                onHoldEnd: (holdEndEvent: PointerEvent) => {
+                    onHoldEnd?.(holdEndEvent)
+                }
+            });
         }, holdDelay);
     };
 
@@ -103,6 +127,8 @@ export const usePointerPress = (
     };
 
     const onPointerup = (event: PointerEvent) => {
+        if (ownershipTransferred) return;
+
         if (event.pointerId !== activePointerId) return;
 
         releasePointerCapture(event);
@@ -146,6 +172,8 @@ export const usePointerPress = (
     };
 
     const onPointercancel = (event: PointerEvent) => {
+        if (ownershipTransferred) return;
+
         if (event.pointerId !== activePointerId) return;
 
         releasePointerCapture(event);

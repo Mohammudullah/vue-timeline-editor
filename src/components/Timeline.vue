@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { onMounted, provide, ref } from 'vue';
-import { TimelineInterface, useTimeline } from '../composables/timeline';
+import { TimelineInterface, useTimeline, UseTimelineInterface } from '../composables/timeline';
 import { TimelineRangeArgInterface, TimelineSectionInterface } from '../types/timeline';
 import { TimelineConfigInterface, useTimelineConfig } from '../composables/timelineConfig';
 import XAxis from './Timeline/Axis/XAxis.vue';
 
 import '../styles/style.css';
+
 import { TimeStringTimeFormatOptions } from '../composables/utils';
 import YAxis from './Timeline/Axis/YAxis.vue';
 import Section from './Timeline/Section/Section.vue';
-import usePointerPress from '../composables/pointerPress';
 import { useFeatures } from '../composables/features/features';
+import Test from './Test.vue';
 
 
 const props = withDefaults(defineProps<{
     initialRange?: TimelineRangeArgInterface,
-    sections: TimelineSectionInterface[],
     timeAxisTimeFormat?: TimeStringTimeFormatOptions
 }>(), {
     initialRange: () => ({
@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emits = defineEmits<{
-    'init': [value: { config: TimelineConfigInterface, timeline: TimelineInterface, container: HTMLDivElement | null }],
+    'init': [value: { config: TimelineConfigInterface, timeline: UseTimelineInterface, container: HTMLDivElement | null }],
     'scroll': [value: Event]
 }>() 
 
@@ -50,10 +50,12 @@ const timeline = useTimeline({
     container: timelineContainer,
     editor: timelineEditor,
     scrollPaneEl: scrollPaneEl,
-    sections: () => props.sections,
 });
 
-const features = useFeatures();
+const features = useFeatures({
+    timeline,
+    timelineConfig,
+});
 
 provide('timeline', timeline);
 provide('timelineConfig', timelineConfig);
@@ -142,11 +144,12 @@ onMounted(() => {
                         class="vtd__timeline-sections"
                     >
                         <Section
-                            v-for="section in timeline.sections"
-                            :key="section.id"
-                            :section="section"
+                            v-for="uuid in timeline.state.sectionUuids"
+                            :key="uuid"
+                            :uuid="uuid"
                             :config="timelineConfig"
                             :timeline="timeline"
+                            :features="features"
                         />
                     </div>
                 </div>
@@ -156,5 +159,37 @@ onMounted(() => {
 
     <slot></slot>
 
-    {{ features.data.dnd }}
+     <pre>
+        {{ features.data.dnd }}
+     </pre>
+    <br/>
+    <pre>
+        {{ features.data.frame.state.selected }}
+    </pre>
+
+    <button
+        @click="() => timeline.updateFrame('frame10', {
+            uuid: 'frame10',
+            title: 'Frame 11',
+            start_ms: 10 * 60 * 60 * 1000,
+            end_ms: 12 * 60 * 60 * 1000
+        })"
+    >
+        Update Frame 10
+    </button>
+    <br>
+    <button
+        @click="() => timeline.updateRow('row10', {
+            uuid: 'row10',
+            title: 'Row 11',
+        })"
+    >
+        Update Row 10
+    </button>
+
+    <!-- <Test
+        v-for="section in timeline.state.sections"
+        :key="section.uuid"
+        :section="section"
+    /> -->
 </template>

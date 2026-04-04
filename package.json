@@ -29,6 +29,11 @@
             "require": "./dist/features/use-snapping.cjs",
             "types": "./dist/features/use-snapping.d.ts"
         },
+        "./features/sections": {
+            "import": "./dist/features/sections.js",
+            "require": "./dist/features/sections.cjs",
+            "types": "./dist/features/sections.d.ts"
+        },
         "./basic-theme.css": "./dist/basic-theme.css"
     },
     "files": [

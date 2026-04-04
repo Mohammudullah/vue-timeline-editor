@@ -10,20 +10,42 @@ export interface TimelineRangeArgInterface {
 
 export interface TimelineSectionInterface {
     title: string,
-    id: string | number,
+    uuid: string | number,
     rows: TimelineRowInterface[]
 }
 
 
 export interface TimelineRowInterface {
-    id: string | number,
+    uuid: string | number,
     title: string,
     frames: TimelineFrameInterface[]
 }
 
 export interface TimelineFrameInterface {
-    id: string | number,
+    uuid: string | number,
     title: string | null,
     start_ms: number,
     end_ms: number
+}
+
+export interface TimelineFrameByUuidInterface {
+    uuid: string | number,
+    title: string | null,
+    start_ms: number,
+    end_ms: number,
+    rowUuid: string | number,
+    sectionUuid: string | number,
+}
+
+
+export interface TimelineSectionByUuidInterface {
+    title: string,
+    uuid: string | number,
+}
+
+
+export interface TimelineRowByUuidInterface {
+    uuid: string | number,
+    title: string,
+    sectionUuid: string | number,
 }

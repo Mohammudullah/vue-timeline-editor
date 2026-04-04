@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { TimelineInterface } from '../../../../composables/timeline';
+import { TimelineInterface, UseTimelineInterface } from '../../../../composables/timeline';
 import { TimelineConfigInterface } from '../../../../composables/timelineConfig';
 import useUtils from '../../../../composables/utils';
 import MinorTicks from './MinorTicks.vue';
@@ -8,7 +8,7 @@ import MinorTicks from './MinorTicks.vue';
 
 const props = withDefaults(defineProps<{
     config: TimelineConfigInterface,
-    timeline: TimelineInterface
+    timeline: UseTimelineInterface
 }>(), {
    
 })
