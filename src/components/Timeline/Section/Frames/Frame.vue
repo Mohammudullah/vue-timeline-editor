@@ -6,30 +6,28 @@ import FrameUI from '../../UI/FrameUI.vue';
 import { UseTimelineInterface } from '../../../../composables/timeline';
 import { UseFeaturesType } from '../../../../composables/features/features';
 import { TimelineConfigInterface } from '../../../../composables/timelineConfig';
+import useUtils from '../../../../composables/utils';
 
 
 const props = withDefaults(defineProps<{
     uuid: string | number,
-    pixelPerMs: number,
-    offsetLeft: number,
     timeline: UseTimelineInterface,
-    features: UseFeaturesType,
     config: TimelineConfigInterface,
+    selected?: boolean,
+    draggable?: boolean,
+    dragging?: boolean,
 }>(), {
     
 })
 
 const emits = defineEmits<{
     'click': [value: PointerEvent, container: HTMLDivElement, frame: TimelineFrameByUuidInterface, uuid: string | number],
-    'dblclick': [value: PointerEvent | MouseEvent, container: HTMLDivElement, frame: TimelineFrameByUuidInterface, uuid: string | number],
-    'holdstart': [value: PointerEvent, controls: PointerPressControls, container: HTMLDivElement, frame: TimelineFrameByUuidInterface, uuid: string | number],
-    'holdend': [value: PointerEvent, container: HTMLDivElement, frame: TimelineFrameByUuidInterface, uuid: string | number],
     'contextmenu': [value: PointerEvent, container: HTMLDivElement, frame: TimelineFrameByUuidInterface, uuid: string | number],
-    'mouseenter': [value: MouseEvent, container: HTMLDivElement, frame: TimelineFrameByUuidInterface, uuid: string | number],
-    'mouseleave': [value: MouseEvent, container: HTMLDivElement, frame: TimelineFrameByUuidInterface, uuid: string | number],
+    'containerUpdate': [value: HTMLDivElement | null, frame: TimelineFrameByUuidInterface, uuid: string | number]
 }>()
 
-//render a uuid to identify this component
+const { calculateFrameWidth } = useUtils();
+
 const frameUi = useTemplateRef<InstanceType<typeof FrameUI>>('frameUi')
     
 const frame = computed<TimelineFrameByUuidInterface>(() => {
@@ -39,19 +37,10 @@ const frame = computed<TimelineFrameByUuidInterface>(() => {
 const container = computed<HTMLDivElement | null>(() => frameUi.value?.container ?? null);
 
 const position = computed<{ left: number; width: number }>(() => ({
-        left: (frame.value.start_ms * props.pixelPerMs) + props.offsetLeft,
-        width: (frame.value.end_ms - frame.value.start_ms) * props.pixelPerMs
+        left: (frame.value.start_ms * props.config.cols.pixelPerMs) + props.config.editor.paddingLeft,
+        width: calculateFrameWidth(frame.value.start_ms, frame.value.end_ms, props.config.cols.pixelPerMs)
     })
 )
-
-
-const framePress = usePointerPress({
-    onClick: (event) => container.value ? emits('click', event, container.value, frame.value, props.uuid) : null,
-    onDoubleClick: (event) => container.value ? emits('dblclick', event, container.value, frame.value, props.uuid) : null,
-    onHoldStart: (event, controls) => container.value ? emits('holdstart', event, controls, container.value, frame.value, props.uuid) : null,
-    onHoldEnd: (event) => container.value ? emits('holdend', event, container.value, frame.value, props.uuid) : null,
-    holdDelay: 300
-})
 
 </script>
 
@@ -61,13 +50,13 @@ const framePress = usePointerPress({
         :left="position.left"
         :width="position.width"
         :frame="frame"
-        @pointerdown="framePress.onPointerdown"
-        @pointermove="framePress.onPointermove"
-        @pointerup="framePress.onPointerup"
-        @pointercancel="framePress.onPointercancel"
-        @contextmenu.prevent="(event) => container ? emits('contextmenu', event, container, frame, uuid) : null"
-        @mouseenter="(event) => container ? emits('mouseenter', event, container, frame, uuid) : null"
-        @mouseleave="(event) => container ? emits('mouseleave', event, container, frame, uuid) : null"
+        @click="(event) => container ? emits('click', event, container, frame, uuid) : null"
+        @container-update="(event) => container ? emits('containerUpdate', event, frame, uuid) : null"
+        :style="{
+            'touch-action' : selected ? 'none' : 'auto'
+        }"
+        :selected="props.selected"
+        v-if="!dragging"
     >
 
     </FrameUI>

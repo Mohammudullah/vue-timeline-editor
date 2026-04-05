@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { PointerPressControls } from '../../../../composables/pointerPress';
 import { UseTimelineInterface } from '../../../../composables/timeline';
-import { TimelineFrameInterface, TimelineRowInterface } from '../../../../types/timeline';
+import { TimelineFrameByUuidInterface, TimelineFrameInterface, TimelineRowInterface } from '../../../../types/timeline';
 import Row from './Row.vue';
 import { TimelineConfigInterface } from '../../../../composables/timelineConfig';
 import { UseFeaturesType } from '../../../../composables/features/features';
@@ -15,14 +15,12 @@ const props = withDefaults(defineProps<{
     
 })
 
-
-const frameHoldStart = (event : PointerEvent, controls : PointerPressControls, frame: TimelineFrameInterface, container: HTMLDivElement, uuid: string | number) => {
-
-    props.features.data.dnd?.startDrag(event, controls, frame, container, uuid)
+const frameClick = (event : PointerEvent, frame: TimelineFrameByUuidInterface, container: HTMLDivElement, uuid: string | number) => {
+    props.features.data.frame.toggleFrame(event, frame, container, uuid)
 }
 
-const frameClick = (event : PointerEvent, frame: TimelineFrameInterface, container: HTMLDivElement, uuid: string | number) => {
-    props.features.data.frame.toggleFrame(event, frame, container, uuid)
+const frameContainerUpdate = (container: HTMLDivElement | null, frame: TimelineFrameByUuidInterface, uuid: string | number) => {
+    props.features.data.frame.syncSelectedContainer(container, frame, uuid)
 }
 
 
@@ -39,8 +37,8 @@ const frameClick = (event : PointerEvent, frame: TimelineFrameInterface, contain
         :padding-left="config.editor.paddingLeft ?? 0"
         :padding-right="config.editor.paddingRight ?? 0"
         :pixel-per-ms="config.cols.pixelPerMs ?? 0"
-        @frameHoldStart="frameHoldStart"
         @frame-click="frameClick"
+        @frame-container-update="frameContainerUpdate"
         :timeline="props.timeline"
         :config="props.config"
         :features="props.features"

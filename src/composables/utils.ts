@@ -47,8 +47,14 @@ const useUtils = () => {
         return result;
     }
 
+    const calculateFrameWidth = (frameStart: number, frameEnd: number, pixelsPerSecond: number): number => {
+        const duration = frameEnd - frameStart;
+        return duration * pixelsPerSecond;
+    }
+
     return {
         secondsToTimeString,
+        calculateFrameWidth,
     }
 }
 

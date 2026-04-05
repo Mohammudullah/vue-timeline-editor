@@ -84,6 +84,7 @@ onMounted(() => {
 <template>
     <div 
         class="vtd__timeline-container vtd"
+        @contextmenu.prevent
         :style="{
             height: timelineConfig.container.height + 'px'
         }" 
@@ -157,7 +158,9 @@ onMounted(() => {
         </div>
     </div>
 
-    <slot></slot>
+    <div class="vtd">
+        <slot></slot>
+    </div>
 
      <pre>
         {{ features.data.dnd }}

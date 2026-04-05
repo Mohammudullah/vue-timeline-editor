@@ -1,13 +1,14 @@
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import useUtils from '../../../composables/utils';
-import { TimelineFrameInterface } from '../../../types/timeline';
+import { TimelineFrameByUuidInterface, TimelineFrameInterface } from '../../../types/timeline';
 
 
 const props = withDefaults(defineProps<{
     left: number,
     width: number,
-    frame: TimelineFrameInterface
+    frame: TimelineFrameByUuidInterface,
+    selected?: boolean,
 }>(), {
     
 })
@@ -19,18 +20,17 @@ const container = ref<HTMLDivElement | null>(null);
 
 
 const emits = defineEmits<{
-    'pointerdown': [value: PointerEvent],
-    'pointermove': [value: PointerEvent],
-    'pointerup': [value: PointerEvent],
-    'pointercancel': [value: PointerEvent],
-    'contextmenu': [value: PointerEvent],
-    'mouseenter': [value: MouseEvent],
-    'mouseleave': [value: MouseEvent],
+    'click': [value: PointerEvent],
+    'containerUpdate': [value: HTMLDivElement | null]
 }>()
 
 
 defineExpose({
     container
+})
+
+watch(container, (newContainer) => {
+    emits('containerUpdate', newContainer);
 })
 
 
@@ -47,14 +47,14 @@ defineExpose({
     >
         <div 
             class="vtd__row-frame"
-            @pointerdown.prevent="$emit('pointerdown', $event)"
-            @pointermove="$emit('pointermove', $event)"
-            @pointerup="$emit('pointerup', $event)"
-            @pointercancel="$emit('pointercancel', $event)"
-            @contextmenu="$emit('contextmenu', $event)"
-            @mouseenter="$emit('mouseenter', $event)"
-            @mouseleave="$emit('mouseleave', $event)"
+            :class="{
+                'vtd__row-frame-selected': selected
+            }"
+            @click="emits('click', $event)"
         >
+            <div class="vtd__frame-drag-handle">
+
+            </div>
             <div class="vtd__row-frame-title">
                 {{ frame.title }}
             </div>
@@ -69,6 +69,8 @@ defineExpose({
                 }) }}
 
             </div>
+
+            <slot></slot>
         </div>
     </div>
 </template>

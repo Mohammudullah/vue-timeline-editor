@@ -28,8 +28,8 @@ export default defineConfig(({ command }) => ({
                 replacement: path.resolve(__dirname, 'dist/features/frame-dnd.js')
             },
             {
-                find: 'vue-timeline-editor/features/use-snapping',
-                replacement: path.resolve(__dirname, 'dist/features/use-snapping.js')
+                find: 'vue-timeline-editor/features/snapping',
+                replacement: path.resolve(__dirname, 'dist/features/snapping.js')
             },
             {
                 find: 'vue-timeline-editor/features/sections',
@@ -56,7 +56,7 @@ export default defineConfig(({ command }) => ({
                 index: 'src/index.ts',
                 timeline: 'src/timeline.ts',
                 'features/frame-dnd': 'src/features/frame-dnd.ts',
-                'features/use-snapping': 'src/features/use-snapping.ts',
+                'features/snapping': 'src/features/snapping.ts',
                 'features/sections': 'src/features/sections.ts',
             },
             name: 'VueTimelineEditor',

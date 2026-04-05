@@ -125,4 +125,8 @@
     color: rgb(120, 120, 120);
 }
 
+.vtd__row-frame-selected {
+    outline: 1px solid rgb(0, 120, 215);
+}
+
 /**------------ Row Styles End ---------------**/ 

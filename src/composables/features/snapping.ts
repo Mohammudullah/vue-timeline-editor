@@ -2,4 +2,6 @@ export const useSnapping = () => {
     
 }
 
-export interface SnappingInterface {}
+export interface SnappingInterface {
+    
+}
