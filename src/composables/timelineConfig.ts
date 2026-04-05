@@ -1,4 +1,4 @@
-import { computed, h, onBeforeUnmount, onMounted, reactive, Ref, toValue, watch } from "vue"
+import { computed, reactive, Ref, watch } from "vue"
 import { TimeStringTimeFormatOptions } from "./utils"
 import { TimelineRangeArgInterface, TimelineRangeInterface } from "../types/timeline"
 
@@ -50,6 +50,11 @@ export const useTimelineConfig = (
             paddingLeft: 10,
             paddingRight: 10,
 
+            containerOffset: {
+                left: rowsLabelWidth,
+                top: colsLabelHeight,
+            },
+
             wrapper: {
                 width: 0,
                 height: 0,
@@ -70,21 +75,13 @@ export const useTimelineConfig = (
             height: 60,
             labelWidth: rowsLabelWidth,
         },
+        sections: {
+            labelHeight: 30,
+        },
         timeAxis: {
             timeFormat: timeAxisTimeFormat,
         },
         range: { start_seconds: 0, end_seconds: 24 * 60 * 60 }
-    })
-
-
-    const editorOffsetFromContainer = computed<{
-        left: number,
-        top: number,
-    }>(() => {
-        return {
-            left: data.rows.labelWidth,
-            top: data.cols.labelHeight,
-        }
     })
 
 
@@ -151,7 +148,7 @@ export const useTimelineConfig = (
         if(!data.container.width) return;
 
         data.editor.width = data.cols.totalPixels + data.editor.paddingLeft + data.editor.paddingRight;
-        data.editor.height = data.container.height;
+        data.editor.height = timelineEditor.value?.scrollHeight ?? data.container.height;
 
         data.editor.wrapper.width = data.editor.width + data.rows.labelWidth;
         data.editor.wrapper.height = data.editor.height;
@@ -162,8 +159,8 @@ export const useTimelineConfig = (
     const syncEditorViewPort = () => {
         if (!timelineContainer.value || !timelineEditor.value || !scrollPaneEl.value) return;
 
-        const offsetX = editorOffsetFromContainer.value.left
-        const offsetY = editorOffsetFromContainer.value.top
+        const offsetX = data.editor.containerOffset.left
+        const offsetY = data.editor.containerOffset.top
 
         // 🔹 Scroll positions
         const scrollLeft = scrollPaneEl.value.scrollLeft
@@ -249,7 +246,7 @@ export const useTimelineConfig = (
     }, { immediate: true })
 
     //sync editor viewport on offset change (for example, when label width changes)
-    watch(editorOffsetFromContainer, syncEditorViewPort)
+    watch([() => data.editor.containerOffset, timelineEditor], syncEditorViewPort)
 
     return data
 }
@@ -260,6 +257,7 @@ export interface TimelineConfigInterface {
         height: number,
     },
     editor: {
+        
         width: number,
         viewPortWidth: number,
         rawViewPortLeft: number,
@@ -278,6 +276,10 @@ export interface TimelineConfigInterface {
         paddingRight: number,
 
         viewPortRatio: number,
+        containerOffset: {
+            left: number,
+            top: number,
+        },
         wrapper: {
             width: number,
             height: number,
@@ -298,6 +300,9 @@ export interface TimelineConfigInterface {
         height: number,
         labelWidth: number,
     }
+    sections: {
+        labelHeight: number,
+    },
     timeAxis: {
         timeFormat: TimeStringTimeFormatOptions,
     },

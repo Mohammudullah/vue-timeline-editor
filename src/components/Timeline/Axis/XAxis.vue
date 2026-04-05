@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TimelineInterface, UseTimelineInterface } from '../../../composables/timeline';
+import { UseTimelineInterface } from '../../../composables/timeline';
 import { TimelineConfigInterface } from '../../../composables/timelineConfig';
 import TimeAxis from './TimeAxis/TimeAxis.vue';
 

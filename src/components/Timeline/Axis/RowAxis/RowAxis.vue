@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { TimelineRowByUuidInterface, TimelineSectionByUuidInterface, TimelineSectionInterface } from '../../../../types/timeline';
+import { UseTimelineInterface } from '../../../../composables/timeline';
+import { TimelineConfigInterface } from '../../../../composables/timelineConfig';
 
 
 const props = withDefaults(defineProps<{
     sections: Record<string | number, TimelineSectionByUuidInterface>,
     rows: Record<string | number, TimelineRowByUuidInterface>,
-    rowLabelWidth: number,
-    rowHeight: number
+    timeline: UseTimelineInterface,
+    config: TimelineConfigInterface
 }>(), {
     
 })
@@ -40,10 +42,20 @@ const rowGroupedBySection = computed<Record<string | number, TimelineRowByUuidIn
                 v-for="section in sections"
                 :key="section.uuid"
             >
+
+                <div 
+                    class="vtd__row-axis-section-label"
+                    :style="{
+                        height: config.sections.labelHeight + 'px'
+                    }"
+                >
+
+                </div>
+
                 <div
                     class="vtd__row-label"
                     :style="{
-                        height: rowHeight + 'px'
+                        height: config.rows.height + 'px'
                     }"
                     v-for="row in rowGroupedBySection[section.uuid]"
                     :key="row.uuid"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Dnd from '../src/components/Features/Dnd.vue';
 import Sections from '../src/components/Features/Sections.vue';
-import UseSnapping from '../src/components/Features/UseSnapping.vue';
+import UseSnapping from '../src/components/Features/Snapping.vue';
 import Timeline from '../src/components/Timeline.vue';
 import '../src/styles/basic-theme.css';
 

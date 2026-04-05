@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { PointerPressControls } from '../../../../composables/pointerPress';
 import { UseTimelineInterface } from '../../../../composables/timeline';
-import { TimelineFrameByUuidInterface, TimelineFrameInterface, TimelineRowInterface } from '../../../../types/timeline';
+import { TimelineFrameByUuidInterface } from '../../../../types/timeline';
 import Row from './Row.vue';
 import { TimelineConfigInterface } from '../../../../composables/timelineConfig';
 import { UseFeaturesType } from '../../../../composables/features/features';

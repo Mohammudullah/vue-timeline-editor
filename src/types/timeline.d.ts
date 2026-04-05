@@ -35,12 +35,16 @@ export interface TimelineFrameByUuidInterface {
     end_ms: number,
     rowUuid: string | number,
     sectionUuid: string | number,
+    editorRelativeLeft: number,
+    width: number,
 }
 
 
 export interface TimelineSectionByUuidInterface {
     title: string,
     uuid: string | number,
+    editorRelativeTop: number,
+    editorRelativeBottom: number,
 }
 
 
@@ -48,4 +52,6 @@ export interface TimelineRowByUuidInterface {
     uuid: string | number,
     title: string,
     sectionUuid: string | number,
+    editorRelativeTop: number,
+    editorRelativeBottom: number,
 }

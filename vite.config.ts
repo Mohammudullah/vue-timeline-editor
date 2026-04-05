@@ -14,7 +14,8 @@ export default defineConfig(({ command }) => ({
         vue(),
         cssInjectedByJsPlugin({
             jsAssetsFilterFunction: (outputChunk) => {
-                return outputChunk.fileName === 'timeline.js' || outputChunk.fileName === 'timeline.cjs'
+                return outputChunk.fileName === 'index.js' || outputChunk.fileName === 'index.cjs'
+                    || outputChunk.fileName === 'timeline.js' || outputChunk.fileName === 'timeline.cjs'
             }
         })
     ],
@@ -24,8 +25,8 @@ export default defineConfig(({ command }) => ({
     resolve: {
         alias: [
             {
-                find: 'vue-timeline-editor/features/frame-dnd',
-                replacement: path.resolve(__dirname, 'dist/features/frame-dnd.js')
+                find: 'vue-timeline-editor/features/dnd',
+                replacement: path.resolve(__dirname, 'dist/features/dnd.js')
             },
             {
                 find: 'vue-timeline-editor/features/snapping',
@@ -55,7 +56,7 @@ export default defineConfig(({ command }) => ({
             entry: {
                 index: 'src/index.ts',
                 timeline: 'src/timeline.ts',
-                'features/frame-dnd': 'src/features/frame-dnd.ts',
+                'features/dnd': 'src/features/dnd.ts',
                 'features/snapping': 'src/features/snapping.ts',
                 'features/sections': 'src/features/sections.ts',
             },

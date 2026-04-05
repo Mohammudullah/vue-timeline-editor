@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TimelineInterface, UseTimelineInterface } from '../../../composables/timeline';
+import { UseTimelineInterface } from '../../../composables/timeline';
 import { TimelineConfigInterface } from '../../../composables/timelineConfig';
 import RowAxis from './RowAxis/RowAxis.vue';
 
@@ -22,10 +22,10 @@ const props = withDefaults(defineProps<{
             
         >
             <RowAxis
+                :config="config"
+                :timeline="timeline"
                 :sections="timeline.state.sectionsByUuid"
                 :rows="timeline.state.sectionRowsByUuid"
-                :rowLabelWidth="config.rows.labelWidth"
-                :rowHeight="config.rows.height"
             />
         </div>
     </div>

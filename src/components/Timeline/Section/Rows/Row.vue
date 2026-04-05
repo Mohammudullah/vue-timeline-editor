@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { computed, onUpdated } from 'vue';
-import { UseDndType } from '../../../../composables/features/dnd';
-import { PointerPressControls } from '../../../../composables/pointerPress';
-import { TimelineFrameByUuidInterface, TimelineFrameInterface, TimelineRowInterface } from '../../../../types/timeline';
+import { computed } from 'vue';
+import { TimelineFrameByUuidInterface } from '../../../../types/timeline';
 import Frame from '../Frames/Frame.vue';
 import { UseTimelineInterface } from '../../../../composables/timeline';
 import { TimelineConfigInterface } from '../../../../composables/timelineConfig';
@@ -27,8 +25,6 @@ const emits = defineEmits<{
 
 const frameUuids = computed(() => props.timeline.state.sectionFrameUuids[props.uuid])
 
-onUpdated(() => console.trace('row updated', props.uuid))
-
 </script>
 <template>
     <div
@@ -42,7 +38,7 @@ onUpdated(() => console.trace('row updated', props.uuid))
         <Frame
             :selected = "features.data.frame.state.selected.uuid === uuid"
             :draggable="features.data.dnd != null && features.data.frame.state.selected.uuid === uuid"
-            :dragging="features.data.dnd?.state.dragging && features.data.dnd.state.draggingUuid === uuid"
+            :dragging="features.data.dnd?.state.dragging && features.data.dnd.state.draggingFrame.uuid === uuid"
             v-for="uuid in frameUuids"
             :key="uuid"
             :uuid="uuid"

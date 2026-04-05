@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue';
+import { computed } from 'vue';
 import { UseFeaturesType } from '../../../composables/features/features';
 import { UseTimelineInterface } from '../../../composables/timeline';
 import { TimelineConfigInterface } from '../../../composables/timelineConfig';
-import { TimelineSectionByUuidInterface, TimelineSectionInterface } from '../../../types/timeline';
+import { TimelineSectionByUuidInterface } from '../../../types/timeline';
 import Rows from './Rows/Rows.vue';
 
 const props = withDefaults(defineProps<{
@@ -19,10 +19,26 @@ const rowsUuids = computed<(string | number)[]>(() => {
     return props.timeline.state.sectionRowUuids[props.uuid];
 })
 
+const section = computed<TimelineSectionByUuidInterface | null>(() => {
+    return props.timeline.state.sectionsByUuid[props.uuid] || null;
+})
+
 </script>
 <template>
     <div class="vtd__timeline-section">
         <div class="vtd__timeline-section-container">
+
+            <div 
+                class="vtd__section-label"
+                :style="{
+                    height: config.sections.labelHeight + 'px',
+                    paddingLeft: config.editor.paddingLeft + 'px',
+                    paddingRight: config.editor.paddingRight + 'px'
+                }"
+            >
+                {{ section?.title }}
+            </div>
+
             <Rows
                 :uuids="rowsUuids"
                 :timeline="timeline"

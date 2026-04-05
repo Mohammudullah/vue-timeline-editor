@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, provide, ref } from 'vue';
-import { TimelineInterface, useTimeline, UseTimelineInterface } from '../composables/timeline';
-import { TimelineRangeArgInterface, TimelineSectionInterface } from '../types/timeline';
+import { useTimeline, UseTimelineInterface } from '../composables/timeline';
+import { TimelineRangeArgInterface } from '../types/timeline';
 import { TimelineConfigInterface, useTimelineConfig } from '../composables/timelineConfig';
 import XAxis from './Timeline/Axis/XAxis.vue';
 
@@ -11,7 +11,6 @@ import { TimeStringTimeFormatOptions } from '../composables/utils';
 import YAxis from './Timeline/Axis/YAxis.vue';
 import Section from './Timeline/Section/Section.vue';
 import { useFeatures } from '../composables/features/features';
-import Test from './Test.vue';
 
 
 const props = withDefaults(defineProps<{
@@ -153,6 +152,8 @@ onMounted(() => {
                             :features="features"
                         />
                     </div>
+
+                    <div id="editorAreaTeleports"></div>
                 </div>
             </div>
         </div>
@@ -163,14 +164,18 @@ onMounted(() => {
     </div>
 
      <pre>
-        {{ features.data.dnd }}
+        {{ features.data.dnd?.state.pointer }}
      </pre>
-    <br/>
+    <!--<br/>
     <pre>
         {{ features.data.frame.state.selected }}
     </pre>
 
-    <button
+    <pre>
+        {{ timeline.state.sectionRowsMeta }}
+    </pre> -->
+
+    <!-- <button
         @click="() => timeline.updateFrame('frame10', {
             uuid: 'frame10',
             title: 'Frame 11',
@@ -188,7 +193,7 @@ onMounted(() => {
         })"
     >
         Update Row 10
-    </button>
+    </button> -->
 
     <!-- <Test
         v-for="section in timeline.state.sections"

@@ -1,8 +1,8 @@
 import { reactive } from "vue";
 import { UseDndType } from "./dnd";
-import { SnappingInterface } from "./snapping";
+import { UseSnappingInterface } from "./snapping";
 import { useFrames, UseFrameInterface } from "./frame";
-import { TimelineInterface, UseTimelineInterface } from "../timeline";
+import { UseTimelineInterface } from "../timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
 
 export const useFeatures = ({
@@ -36,7 +36,7 @@ export const useFeatures = ({
         if(feature === 'dnd') {
             features.dnd = value() as UseDndType;
         } else if(feature === 'snapping') {
-            features.snapping = value() as SnappingInterface;
+            features.snapping = value() as UseSnappingInterface;
         }
     }
 
@@ -62,9 +62,9 @@ export const useFeatures = ({
 export interface FeaturesInterface {
     frame: UseFrameInterface,
     dnd: UseDndType | null,
-    snapping: SnappingInterface | null,
+    snapping: UseSnappingInterface | null,
 }
 
 export type UseFeaturesType = ReturnType<typeof useFeatures>;
 
-export type InitFeatureType = UseDndType | SnappingInterface | UseFrameInterface;
+export type InitFeatureType = UseDndType | UseSnappingInterface | UseFrameInterface;

@@ -1,9 +1,8 @@
 import { onBeforeUnmount, reactive, Reactive, watch } from "vue"
-import { TimelineFrameByUuidInterface, TimelineFrameInterface } from "../../types/timeline";
+import { TimelineFrameByUuidInterface } from "../../types/timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
-import { TimelineInterface, UseTimelineInterface } from "../timeline";
+import { UseTimelineInterface } from "../timeline";
 import { PointerPressControls } from "../pointerPress";
-import { clear } from "node:console";
 import { UseFrameInterface } from "./frame";
 
 export const useDnd = ({
@@ -25,8 +24,6 @@ export const useDnd = ({
 
     const state = reactive<DndStateInterface>({
         dragging: false,
-        draggingFrame: null,
-        draggingUuid: null,
         container: {
             width: 0,
             height: 0,
@@ -35,10 +32,16 @@ export const useDnd = ({
             pointerY: 0,
         },
         draggingPlaceholder: {
-            left: 0,
-            right: 0,
+            left: 0, 
             top: 0,
-            bottom: 0,
+        },
+        draggingFrame: {
+            data: null,
+            uuid: null,
+            over: {
+                sectionUuid: null,
+                rowUuid: null,
+            }
         },
         pointer: {
             clientX: 0,
@@ -46,6 +49,14 @@ export const useDnd = ({
 
             relativeX: 0,
             relativeY: 0,
+
+            editorRelativeX: 0,
+            editorRelativeY: 0,
+
+            over: {
+                sectionUuid: null as string | number | null,
+                rowUuid: null as string | number | null,
+            }
         }
     });
 
@@ -64,6 +75,52 @@ export const useDnd = ({
     }
 
 
+    const rowsCenterCache = [] as {
+        sectionUuid: string | number,
+        rowUuid: string | number,
+        center: number,
+    }[];
+
+
+
+    const calculateRowsCenterCache = () => {
+        Object.values(timeline.state.sectionRowsByUuid).forEach((row) => {
+            const center = row.editorRelativeTop + timelineConfig.rows.height / 2;
+            rowsCenterCache.push({
+                sectionUuid: row.sectionUuid,
+                rowUuid: row.uuid,
+                center,
+            });
+        });
+    }
+
+    // A binary search function to find the closest row center to the given y position
+    const setPointerOverRow = (y: number) => {
+        let left = 0;
+        let right = rowsCenterCache.length - 1;
+
+        while (left <= right) {
+            const mid = (left + right) >> 1;
+            const center = rowsCenterCache[mid].center;
+
+            if (center < y) left = mid + 1;
+            else if (center > y) right = mid - 1;
+            else return rowsCenterCache[mid];
+        }
+
+        const l = rowsCenterCache[left];
+        const r = rowsCenterCache[right];
+
+        if (!l) return r ?? null;
+        if (!r) return l;
+
+        const row = Math.abs(l.center - y) < Math.abs(r.center - y) ? l : r;
+
+        state.pointer.over.sectionUuid = row.sectionUuid;
+        state.pointer.over.rowUuid = row.rowUuid;
+    };
+
+
     const startDrag = (event: PointerEvent) => {
 
         const frameContainer = frame.state.selected.container;
@@ -79,9 +136,12 @@ export const useDnd = ({
             return;
         }
 
+        // cache the rows center positions for finding the closest row during dragging
+        calculateRowsCenterCache();
+
         state.dragging = true;
-        state.draggingFrame = frame.state.selected.frame;
-        state.draggingUuid = frame.state.selected.uuid;
+        state.draggingFrame.data = frame.state.selected.frame;
+        state.draggingFrame.uuid = frame.state.selected.uuid;
 
         updateDraggingPositions(event);
         setContainer(frameContainer);
@@ -102,8 +162,10 @@ export const useDnd = ({
         pointerControls = null;
 
         state.dragging = false;
-        state.draggingFrame = null;
-        state.draggingUuid = null;
+        state.draggingFrame.data = null;
+        state.draggingFrame.uuid = null;
+        state.draggingFrame.over.sectionUuid = null;
+        state.draggingFrame.over.rowUuid = null;
 
         if(timeline.state.editor) {
 
@@ -122,16 +184,18 @@ export const useDnd = ({
         state.pointer.relativeX = event.clientX + timelineConfig.editor.viewPortLeft;
         state.pointer.relativeY = event.clientY + timelineConfig.editor.viewPortTop;
 
+        state.pointer.editorRelativeX = state.pointer.relativeX - timelineConfig.editor.containerOffset.left;
+        state.pointer.editorRelativeY = state.pointer.relativeY - timelineConfig.editor.containerOffset.top;
+
         setPlaceholderPosition();
         scrollWhileDragging(event);
+        setPointerOverRow(state.pointer.editorRelativeY);
     }
 
     const setPlaceholderPosition = () => {
         
-        state.draggingPlaceholder.left = state.pointer.clientX - state.container.pointerX;
-        state.draggingPlaceholder.top = state.pointer.clientY - state.container.pointerY;
-        state.draggingPlaceholder.right = state.draggingPlaceholder.left + (state.container.width || 0);
-        state.draggingPlaceholder.bottom = state.draggingPlaceholder.top + (state.container.height || 0);
+        state.draggingPlaceholder.left = state.pointer.editorRelativeX - state.container.pointerX;
+        state.draggingPlaceholder.top = state.pointer.editorRelativeY - state.container.pointerY;
     }
 
     const scrollWhileDragging = (event: PointerEvent) => {
@@ -178,7 +242,7 @@ export const useDnd = ({
     //this listener is necessary to ensure that pointer events are captured even if the editor element is re-rendered
     //pointer events help to identify the pointer position during dragging
     watch(() => timeline.state.editor, (newEditor, oldEditor) => {
-        console.log('timeline editor changed:', { newEditor, oldEditor });
+
         oldEditor 
         ? Object.entries(editorPointerEvents).forEach(
             ([event, handler]) => oldEditor.removeEventListener(event as eventTypes, handler)
@@ -216,8 +280,14 @@ export interface DndInterface {
 
 export interface DndStateInterface {
     dragging: boolean,
-    draggingFrame: null | TimelineFrameByUuidInterface,
-    draggingUuid: null | string | number,
+    draggingFrame: {
+        data: TimelineFrameByUuidInterface | null,
+        uuid: string | number | null,
+        over: {
+            sectionUuid: string | number | null,
+            rowUuid: string | number | null,
+        }
+    }
     container: {
         width: number,
         height: number,
@@ -229,11 +299,15 @@ export interface DndStateInterface {
         clientY: number,
         relativeX: number,
         relativeY: number,
+        editorRelativeX: number,
+        editorRelativeY: number,
+        over: {
+            sectionUuid: string | number | null,
+            rowUuid: string | number | null,
+        }
     },
     draggingPlaceholder: {
         left: number,
-        right: number,
         top: number,
-        bottom: number,
     }
 }

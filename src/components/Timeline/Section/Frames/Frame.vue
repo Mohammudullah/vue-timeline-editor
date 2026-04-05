@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import { computed, onUpdated, useTemplateRef } from 'vue';
-import { TimelineFrameByUuidInterface, TimelineFrameInterface } from '../../../../types/timeline';
-import usePointerPress, { PointerPressControls } from '../../../../composables/pointerPress';
+import { computed, useTemplateRef } from 'vue';
+import { TimelineFrameByUuidInterface } from '../../../../types/timeline';
 import FrameUI from '../../UI/FrameUI.vue';
 import { UseTimelineInterface } from '../../../../composables/timeline';
-import { UseFeaturesType } from '../../../../composables/features/features';
 import { TimelineConfigInterface } from '../../../../composables/timelineConfig';
-import useUtils from '../../../../composables/utils';
 
 
 const props = withDefaults(defineProps<{
@@ -26,8 +23,6 @@ const emits = defineEmits<{
     'containerUpdate': [value: HTMLDivElement | null, frame: TimelineFrameByUuidInterface, uuid: string | number]
 }>()
 
-const { calculateFrameWidth } = useUtils();
-
 const frameUi = useTemplateRef<InstanceType<typeof FrameUI>>('frameUi')
     
 const frame = computed<TimelineFrameByUuidInterface>(() => {
@@ -36,19 +31,13 @@ const frame = computed<TimelineFrameByUuidInterface>(() => {
 
 const container = computed<HTMLDivElement | null>(() => frameUi.value?.container ?? null);
 
-const position = computed<{ left: number; width: number }>(() => ({
-        left: (frame.value.start_ms * props.config.cols.pixelPerMs) + props.config.editor.paddingLeft,
-        width: calculateFrameWidth(frame.value.start_ms, frame.value.end_ms, props.config.cols.pixelPerMs)
-    })
-)
-
 </script>
 
 <template>
     <FrameUI
         ref="frameUi"
-        :left="position.left"
-        :width="position.width"
+        :left="frame.editorRelativeLeft"
+        :width="frame.width"
         :frame="frame"
         @click="(event) => container ? emits('click', event, container, frame, uuid) : null"
         @container-update="(event) => container ? emits('containerUpdate', event, frame, uuid) : null"

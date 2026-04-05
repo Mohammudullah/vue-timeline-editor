@@ -1,7 +1,7 @@
 import { reactive } from "vue";
-import { TimelineInterface, UseTimelineInterface } from "../timeline";
+import { UseTimelineInterface } from "../timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
-import { TimelineFrameByUuidInterface, TimelineFrameInterface } from "../../types/timeline";
+import { TimelineFrameByUuidInterface } from "../../types/timeline";
 
 export const useFrames = ({
     timeline,

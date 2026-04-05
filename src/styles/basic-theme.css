@@ -13,7 +13,7 @@
     /** Time Axis Colors **/
     --vtd__theme-time-axis-major-tick-color: var(--vtd__time-axis-major-tick-color, black);
     --vtd__theme-time-axis-minor-tick-color: var(--vtd__time-axis-minor-tick-color, black);
-    --vtd__theme-time-axis-bg: var(--vtd__time-axis-bg, rgb(238, 238, 238));
+    --vtd__theme-time-axis-bg: var(--vtd__time-axis-bg, rgb(207, 207, 207));
 }
 
 .vtd, .vtd * {
@@ -27,6 +27,21 @@
 }
 
 /**------------ Global Styles End ---------------**/
+
+
+/**------------ Section Styles Start ---------------**/
+
+.vtd__section-label {
+    display: flex;
+    align-items: center;
+    font-size: .75rem;
+    font-weight: 500;
+    background-color: rgb(238, 238, 238);
+    position: static;
+    top: 0;
+}
+
+/**------------ Section Styles End ---------------**/
 
 
 /**------------ Time Axis Styles Start ---------------**/
@@ -68,7 +83,6 @@
 }
 
 .vtd__timeline-header-spacer {
-    border-bottom: 1px solid rgb(238, 238, 238);
     border-right: 1px solid rgb(238, 238, 238);
 }
 
@@ -89,8 +103,16 @@
     border-right: 1px solid rgb(238, 238, 238);
 }
 
+.vtd__row-axis-section-label {
+    border-right: 1px solid rgb(238, 238, 238);
+}
+
 .vtd__row-label:nth-child(odd) {
     background-color: rgb(248, 248, 248);
+}
+
+.vtd__row-axis-section-label {
+    border-bottom: 1px solid rgb(238, 238, 238);
 }
 
 /**------------ Row Axis Styles End ---------------**/
@@ -130,3 +152,8 @@
 }
 
 /**------------ Row Styles End ---------------**/ 
+
+
+.vtd__dragging-placeholder {
+    transition: transform 100ms cubic-bezier(0.2, 0, 0, 1);
+}
