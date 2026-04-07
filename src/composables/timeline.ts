@@ -71,33 +71,9 @@ export const useTimeline = (
 
             section.rows.forEach((row, rowIndex) => {
 
-                //update counts
+                //update counts and create array to store row uuids
                 state.rowsCount++;
-
-                //store section row meta, calculate row top and bottom which will help in hit pointer interactions
-                //like dragging and clicking to add frame
-                
-                const rowBottom = state.rowsCount * config.rows.height + (state.sectionsCount * config.sections.labelHeight);
-                const rowTop = rowBottom - config.rows.height;
-
-                if(rowIndex === 0) {
-                    firstRowTop = rowTop;
-                }
-                if(rowIndex === section.rows.length - 1) {
-                    lastRowBottom = rowBottom;
-                }
-
-                state.sectionRowsByUuid[row.uuid] = {
-                    uuid: row.uuid,
-                    title: row.title,
-                    sectionUuid: section.uuid,
-                    editorRelativeTop: rowTop,
-                    editorRelativeBottom: rowBottom,
-                }
-
-                state.sectionRowUuids[section.uuid].push(row.uuid);
                 state.sectionFrameUuids[row.uuid] = [];
-
                 
                 row.frames.forEach((frame, frameIndex) => {
 
@@ -122,6 +98,33 @@ export const useTimeline = (
 
                     state.sectionFrameUuids[row.uuid].push(frame.uuid);
                 })
+
+
+                //store section row meta, calculate row top and bottom which will help in hit pointer interactions
+                //like dragging and clicking to add frame
+                
+                const rowBottom = state.rowsCount * config.rows.height + (state.sectionsCount * config.sections.labelHeight);
+                const rowTop = rowBottom - config.rows.height;
+
+                if(rowIndex === 0) {
+                    firstRowTop = rowTop;
+                }
+                if(rowIndex === section.rows.length - 1) {
+                    lastRowBottom = rowBottom;
+                }
+
+                state.sectionRowsByUuid[row.uuid] = {
+                    uuid: row.uuid,
+                    title: row.title,
+                    sectionUuid: section.uuid,
+                    editorRelativeTop: rowTop,
+                    editorRelativeBottom: rowBottom,
+                    emptyAreas: getEmptyAreasOfRow(row.uuid, 0, config.range.end_seconds * 1000),
+                }
+
+                console.log('row empty areas', state.sectionRowsByUuid[row.uuid].emptyAreas);
+
+                state.sectionRowUuids[section.uuid].push(row.uuid);
             })
 
             //store section data
@@ -133,6 +136,29 @@ export const useTimeline = (
             }
 
         })
+    }
+
+
+    const getEmptyAreasOfRow = (rowUuid: string | number, start_ms: number, end_ms: number) => {
+        const emptyAreas: { start_ms: number; end_ms: number }[] = [];
+
+        const frames = Object.values(state.sectionFramesByUuid).filter(frame => frame.rowUuid === rowUuid);
+        const sortedFrames = frames.sort((a, b) => a.start_ms - b.start_ms);
+
+        let cursor = start_ms;
+
+        for (const frame of sortedFrames) {
+            if (frame.start_ms > cursor) {
+                emptyAreas.push({ start_ms: cursor, end_ms: frame.start_ms });
+            }
+            cursor = Math.max(cursor, frame.end_ms);
+        }
+
+        if (cursor < end_ms) {
+            emptyAreas.push({ start_ms: cursor, end_ms });
+        }
+
+        return emptyAreas;
     }
 
     const updateRow = (uuid: string | number, row: {title: string, uuid: string | number}) => {

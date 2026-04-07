@@ -34,11 +34,21 @@ export const useDnd = ({
         draggingPlaceholder: {
             left: 0, 
             top: 0,
+            start_ms: 0,
+            end_ms: 0,
         },
         draggingFrame: {
             data: null,
             uuid: null,
             over: {
+                sectionUuid: null,
+                rowUuid: null,
+            },
+            previous: {
+                sectionUuid: null,
+                rowUuid: null,
+            },
+            initial: {
                 sectionUuid: null,
                 rowUuid: null,
             }
@@ -52,6 +62,8 @@ export const useDnd = ({
 
             editorRelativeX: 0,
             editorRelativeY: 0,
+
+            on_ms: 0,
 
             over: {
                 sectionUuid: null as string | number | null,
@@ -96,25 +108,32 @@ export const useDnd = ({
 
     // A binary search function to find the closest row center to the given y position
     const setPointerOverRow = (y: number) => {
-        let left = 0;
-        let right = rowsCenterCache.length - 1;
+        let top = 0;
+        let bottom = rowsCenterCache.length - 1;
 
-        while (left <= right) {
-            const mid = (left + right) >> 1;
+        while (top <= bottom) {
+            const mid = (top + bottom) >> 1;
             const center = rowsCenterCache[mid].center;
 
-            if (center < y) left = mid + 1;
-            else if (center > y) right = mid - 1;
-            else return rowsCenterCache[mid];
+            if (center < y) top = mid + 1;
+            else if (center > y) bottom = mid - 1;
+            else {
+                const row = rowsCenterCache[mid];
+                state.pointer.over.sectionUuid = row.sectionUuid;
+                state.pointer.over.rowUuid = row.rowUuid;
+                return;
+            }
         }
 
-        const l = rowsCenterCache[left];
-        const r = rowsCenterCache[right];
+        const l = rowsCenterCache[top];
+        const r = rowsCenterCache[bottom];
 
-        if (!l) return r ?? null;
-        if (!r) return l;
+        const row =
+            !l ? r :
+            !r ? l :
+            Math.abs(l.center - y) < Math.abs(r.center - y) ? l : r;
 
-        const row = Math.abs(l.center - y) < Math.abs(r.center - y) ? l : r;
+        if (!row) return;
 
         state.pointer.over.sectionUuid = row.sectionUuid;
         state.pointer.over.rowUuid = row.rowUuid;
@@ -173,6 +192,25 @@ export const useDnd = ({
                 timeline.state.editor.releasePointerCapture(event.pointerId);
             }
         }
+
+
+        //clear rows center cache
+        rowsCenterCache.length = 0;
+
+        //clear dragging frame data
+        state.draggingFrame.data = null;
+        state.draggingFrame.uuid = null;
+        state.draggingFrame.over.sectionUuid = null;
+        state.draggingFrame.over.rowUuid = null;
+        state.draggingFrame.previous.sectionUuid = null;
+        state.draggingFrame.previous.rowUuid = null;
+        state.draggingFrame.initial.sectionUuid = null;
+        state.draggingFrame.initial.rowUuid = null;
+
+
+        //clear pointer over data
+        state.pointer.over.sectionUuid = null;
+        state.pointer.over.rowUuid = null;
     }
 
     const updateDraggingPositions = (event: PointerEvent) => {
@@ -187,16 +225,51 @@ export const useDnd = ({
         state.pointer.editorRelativeX = state.pointer.relativeX - timelineConfig.editor.containerOffset.left;
         state.pointer.editorRelativeY = state.pointer.relativeY - timelineConfig.editor.containerOffset.top;
 
+        state.pointer.on_ms = (state.pointer.editorRelativeX - timelineConfig.editor.paddingLeft) / timelineConfig.cols.pixelPerMs;
+
+        setPointerOverRow(state.pointer.editorRelativeY);
         setPlaceholderPosition();
         scrollWhileDragging(event);
-        setPointerOverRow(state.pointer.editorRelativeY);
+        setFramePositions();
     }
 
     const setPlaceholderPosition = () => {
         
         state.draggingPlaceholder.left = state.pointer.editorRelativeX - state.container.pointerX;
         state.draggingPlaceholder.top = state.pointer.editorRelativeY - state.container.pointerY;
+
+        const start = state.draggingPlaceholder.left - timelineConfig.editor.paddingLeft;
+
+        state.draggingPlaceholder.start_ms =  start / timelineConfig.cols.pixelPerMs;
+        state.draggingPlaceholder.end_ms = (start + state.draggingFrame.data!.width) / timelineConfig.cols.pixelPerMs;
     }
+
+    const setFramePositions = () => {
+        if(!state.draggingFrame.data) return;
+
+        //set initial position if not set yet
+        if(!state.draggingFrame.initial.sectionUuid || !state.draggingFrame.initial.rowUuid) {
+            state.draggingFrame.initial.sectionUuid = state.draggingFrame.data.sectionUuid;
+            state.draggingFrame.initial.rowUuid = state.draggingFrame.data.rowUuid;
+        }
+
+
+        const pointerOverSectionUuid = state.pointer.over.sectionUuid;
+        const pointerOverRowUuid = state.pointer.over.rowUuid;
+
+        const lastOverSectionUuid = state.draggingFrame.over.sectionUuid;
+        const lastOverRowUuid = state.draggingFrame.over.rowUuid;
+
+        const previousSectionUuid = state.draggingFrame.previous.sectionUuid;
+        const previousRowUuid = state.draggingFrame.previous.rowUuid;
+
+        //update previous over position
+        state.draggingFrame.previous.sectionUuid = lastOverSectionUuid !== pointerOverSectionUuid ? state.draggingFrame.over.sectionUuid : previousSectionUuid;
+        state.draggingFrame.previous.rowUuid = lastOverRowUuid !== pointerOverRowUuid ? state.draggingFrame.over.rowUuid : previousRowUuid;
+
+        state.draggingFrame.over.sectionUuid = pointerOverSectionUuid;
+        state.draggingFrame.over.rowUuid = pointerOverRowUuid;
+    }              
 
     const scrollWhileDragging = (event: PointerEvent) => {
         if(!state.dragging) return;
@@ -286,6 +359,14 @@ export interface DndStateInterface {
         over: {
             sectionUuid: string | number | null,
             rowUuid: string | number | null,
+        },
+        previous: {
+            sectionUuid: string | number | null,
+            rowUuid: string | number | null,
+        },
+        initial: {
+            sectionUuid: string | number | null,
+            rowUuid: string | number | null,
         }
     }
     container: {
@@ -301,6 +382,9 @@ export interface DndStateInterface {
         relativeY: number,
         editorRelativeX: number,
         editorRelativeY: number,
+
+        on_ms: number,
+
         over: {
             sectionUuid: string | number | null,
             rowUuid: string | number | null,
@@ -309,5 +393,7 @@ export interface DndStateInterface {
     draggingPlaceholder: {
         left: number,
         top: number,
+        start_ms: number,
+        end_ms: number,
     }
 }

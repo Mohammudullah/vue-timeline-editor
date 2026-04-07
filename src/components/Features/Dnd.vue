@@ -8,9 +8,6 @@ import FrameUI from '../Timeline/UI/FrameUI.vue';
 import useUtils from '../../composables/utils';
 import { UseSnappingInterface } from '../../composables/features/snapping';
 
-
-const { calculateFrameWidth } = useUtils();
-
 const timeline = inject<UseTimelineInterface>('timeline');
 const timelineConfig = inject<TimelineConfigInterface>('timelineConfig');
 const features = inject<ReturnType<typeof useFeatures>>('features');

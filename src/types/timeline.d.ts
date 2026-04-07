@@ -54,4 +54,5 @@ export interface TimelineRowByUuidInterface {
     sectionUuid: string | number,
     editorRelativeTop: number,
     editorRelativeBottom: number,
+    emptyAreas: { start_ms: number; end_ms: number }[],
 }

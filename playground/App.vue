@@ -29,12 +29,20 @@ import '../src/styles/basic-theme.css';
                     {
                         uuid: 'row2',
                         title: 'Row 2',
-                        frames: [{
-                            uuid: 'frame2',
-                            title: 'Frame 2',
-                            start_ms: 2 * 60 * 60 * 1000,
-                            end_ms: 4 * 60 * 60 * 1000
-                        }]
+                        frames: [
+                            {
+                                uuid: 'frame2',
+                                title: 'Frame 2',
+                                start_ms: 2 * 60 * 60 * 1000,
+                                end_ms: 4 * 60 * 60 * 1000
+                            },
+                            {
+                                uuid: 'row2-frame3',
+                                title: 'Frame 3',
+                                start_ms: 0,
+                                end_ms: 2 * 60 * 60 * 1000
+                            }
+                        ]
                     },
                     {
                         uuid: 'row3',
