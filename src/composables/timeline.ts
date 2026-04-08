@@ -1,5 +1,5 @@
 import { reactive, Ref, watch } from "vue"
-import { TimelineFrameByUuidInterface, TimelineFrameInterface, TimelineRowByUuidInterface, TimelineSectionByUuidInterface, TimelineSectionInterface } from '../types/timeline';
+import { TimelineFrameByUuidBasicInterface, TimelineFrameByUuidInterface, TimelineFrameInterface, TimelineRowByUuidInterface, TimelineSectionByUuidInterface, TimelineSectionInterface } from '../types/timeline';
 import { TimelineConfigInterface } from "./timelineConfig";
 import useUtils from "./utils";
 
@@ -53,6 +53,50 @@ export const useTimeline = (
     })
 
 
+    const renderFrame = (frame: TimelineFrameByUuidBasicInterface | TimelineFrameByUuidInterface | TimelineFrameInterface, rowUuid: string | number, sectionUuid: string | number) => {
+        //calculate frame left and width which will help in hit pointer interactions
+        const frameLeft = (frame.start_ms * config.cols.pixelPerMs) + config.editor.paddingLeft;
+        const width  = calculateFrameWidth(frame.start_ms, frame.end_ms, config.cols.pixelPerMs);
+        
+        return {
+            uuid: frame.uuid,
+            title: frame.title,
+            start_ms: frame.start_ms,
+            end_ms: frame.end_ms,
+            rowUuid: rowUuid,
+            sectionUuid: sectionUuid,
+            editorRelativeLeft: frameLeft,
+            width: width,
+        }
+    }
+
+
+    const registerFrame = (renderedFrame: ReturnType<typeof renderFrame>, updating: boolean = false) => {
+
+        if(updating) {
+            const existingFrame = state.sectionFramesByUuid[renderedFrame.uuid];
+
+            //clear existing frame uuid from the row's frame uuid array to avoid duplicates, it will be added again later in the function
+            if(existingFrame) {
+                const existingRowFrameUuids = state.sectionFrameUuids[existingFrame.rowUuid];
+                if(existingRowFrameUuids) {
+                    state.sectionFrameUuids[existingFrame.rowUuid] = existingRowFrameUuids.filter(uuid => uuid !== renderedFrame.uuid);
+                }
+            }
+        }
+
+        state.sectionFramesByUuid[renderedFrame.uuid] = renderedFrame;
+
+        if(!state.sectionFrameUuids[renderedFrame.rowUuid]) {
+            state.sectionFrameUuids[renderedFrame.rowUuid] = [];
+        }
+
+        state.sectionFrameUuids[renderedFrame.rowUuid].push(renderedFrame.uuid);
+
+        
+    }
+
+
     const initSections = (sections: TimelineSectionInterface[]) => {
 
 
@@ -80,23 +124,7 @@ export const useTimeline = (
                     //update counts
                     state.framesCount++;
 
-
-                    //store section frame meta, calculate frame left and width which will help in hit pointer interactions
-                    const frameLeft = (frame.start_ms * config.cols.pixelPerMs) + config.editor.paddingLeft;
-                    const width  = calculateFrameWidth(frame.start_ms, frame.end_ms, config.cols.pixelPerMs);
-                    
-                    state.sectionFramesByUuid[frame.uuid] = {
-                        uuid: frame.uuid,
-                        title: frame.title,
-                        start_ms: frame.start_ms,
-                        end_ms: frame.end_ms,
-                        rowUuid: row.uuid,
-                        sectionUuid: section.uuid,
-                        editorRelativeLeft: frameLeft,
-                        width: width,
-                    }
-
-                    state.sectionFrameUuids[row.uuid].push(frame.uuid);
+                    registerFrame(renderFrame(frame, row.uuid, section.uuid));
                 })
 
 
@@ -121,8 +149,6 @@ export const useTimeline = (
                     editorRelativeBottom: rowBottom,
                     emptyAreas: getEmptyAreasOfRow(row.uuid, 0, config.range.end_seconds * 1000),
                 }
-
-                console.log('row empty areas', state.sectionRowsByUuid[row.uuid].emptyAreas);
 
                 state.sectionRowUuids[section.uuid].push(row.uuid);
             })
@@ -173,15 +199,8 @@ export const useTimeline = (
     }
 
 
-    const updateFrame = (uuid: string | number, frame: TimelineFrameInterface) => {
-        const existingFrame = state.sectionFramesByUuid[uuid];
-
-        if(existingFrame) {
-            state.sectionFramesByUuid[uuid] = {
-                ...existingFrame,   
-                ...frame,
-            }
-        }
+    const updateFrame = (uuid: string | number, frame: TimelineFrameByUuidBasicInterface) => {
+        registerFrame(renderFrame(frame, frame.rowUuid, frame.sectionUuid), true);
 
     }
 

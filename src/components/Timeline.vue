@@ -165,6 +165,7 @@ onMounted(() => {
 
      <pre>
         {{ features.data.dnd?.state.pointer }}
+        {{ features.data.dnd?.state.draggingPlaceholder }}
      </pre>
     <!--<br/>
     <pre>

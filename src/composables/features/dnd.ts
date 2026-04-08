@@ -4,6 +4,7 @@ import { TimelineConfigInterface } from "../timelineConfig";
 import { UseTimelineInterface } from "../timeline";
 import { PointerPressControls } from "../pointerPress";
 import { UseFrameInterface } from "./frame";
+import { DraggedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
 
 export const useDnd = ({
     timeline,
@@ -14,13 +15,9 @@ export const useDnd = ({
     timelineConfig: TimelineConfigInterface,
     frame: UseFrameInterface
 
-}) : Reactive<DndInterface> => {
+}) => {
 
-    let currentFrameContainer: HTMLDivElement | null = null;
 
-    // The pointer controls first starts on frame then is transferred to the dnd
-    // so, we store frame pointer controls here to call onHoldEnd when drag ends
-    let pointerControls: PointerPressControls | null = null;
 
     const state = reactive<DndStateInterface>({
         dragging: false,
@@ -40,18 +37,6 @@ export const useDnd = ({
         draggingFrame: {
             data: null,
             uuid: null,
-            over: {
-                sectionUuid: null,
-                rowUuid: null,
-            },
-            previous: {
-                sectionUuid: null,
-                rowUuid: null,
-            },
-            initial: {
-                sectionUuid: null,
-                rowUuid: null,
-            }
         },
         pointer: {
             clientX: 0,
@@ -71,6 +56,27 @@ export const useDnd = ({
             }
         }
     });
+
+
+    const draggingEvents = useDraggingEvents();
+
+
+    const getDraggingFrameData = () : DraggedFrameDataInterface => {
+        return {
+            initial: {
+                sectionUuid: state.draggingFrame.data?.sectionUuid ?? null,
+                rowUuid: state.draggingFrame.data?.rowUuid ?? null,
+                start_ms: state.draggingFrame.data?.start_ms ?? 0,
+                end_ms: state.draggingFrame.data?.end_ms ?? 0,
+            },
+            current: {
+                sectionUuid: state.pointer.over.sectionUuid,
+                rowUuid: state.pointer.over.rowUuid,
+                start_ms: state.draggingPlaceholder.start_ms,
+                end_ms: state.draggingPlaceholder.end_ms,
+            }
+        }
+    }
 
 
     const setContainer = (container: HTMLDivElement) => {
@@ -172,19 +178,31 @@ export const useDnd = ({
                 timeline.state.editor.setPointerCapture(event.pointerId);
             }
         }
+
+        draggingEvents.triggerOnDragStart(state.draggingFrame.data!, event);
+    }
+
+    const cancelDrag = (event: PointerEvent) => {
+
+        if(!state.dragging) return;
+
+        draggingEvents.triggerOnDragCancel(state.draggingFrame.data!, getDraggingFrameData(), event);
+        dragEnd(event);
+    }
+
+    const drop = (event: PointerEvent) => {
+
+        if(!state.dragging) return;
+
+        draggingEvents.triggerOnDrop(state.draggingFrame.data!, getDraggingFrameData(), event);
+        
+        dragEnd(event);
     }
 
     const dragEnd = (event: PointerEvent) => {
         if(!state.dragging) return;
 
-        pointerControls?.onHoldEnd(event);
-        pointerControls = null;
-
         state.dragging = false;
-        state.draggingFrame.data = null;
-        state.draggingFrame.uuid = null;
-        state.draggingFrame.over.sectionUuid = null;
-        state.draggingFrame.over.rowUuid = null;
 
         if(timeline.state.editor) {
 
@@ -193,6 +211,7 @@ export const useDnd = ({
             }
         }
 
+        draggingEvents.triggerOnDragEnd(state.draggingFrame.data!, getDraggingFrameData(), event);
 
         //clear rows center cache
         rowsCenterCache.length = 0;
@@ -200,13 +219,6 @@ export const useDnd = ({
         //clear dragging frame data
         state.draggingFrame.data = null;
         state.draggingFrame.uuid = null;
-        state.draggingFrame.over.sectionUuid = null;
-        state.draggingFrame.over.rowUuid = null;
-        state.draggingFrame.previous.sectionUuid = null;
-        state.draggingFrame.previous.rowUuid = null;
-        state.draggingFrame.initial.sectionUuid = null;
-        state.draggingFrame.initial.rowUuid = null;
-
 
         //clear pointer over data
         state.pointer.over.sectionUuid = null;
@@ -216,21 +228,30 @@ export const useDnd = ({
     const updateDraggingPositions = (event: PointerEvent) => {
         if(!state.dragging) return;
 
+        const scrollPaneEl = timeline.state.scrollPaneEl;
+        if(!scrollPaneEl) return;
+
+        const rect = scrollPaneEl.getBoundingClientRect();
+
         state.pointer.clientX = event.clientX;
         state.pointer.clientY = event.clientY;
 
-        state.pointer.relativeX = event.clientX + timelineConfig.editor.viewPortLeft;
-        state.pointer.relativeY = event.clientY + timelineConfig.editor.viewPortTop;
+        // Pointer position inside the visible scroll pane
+        state.pointer.relativeX = event.clientX - rect.left;
+        state.pointer.relativeY = event.clientY - rect.top;
 
-        state.pointer.editorRelativeX = state.pointer.relativeX - timelineConfig.editor.containerOffset.left;
-        state.pointer.editorRelativeY = state.pointer.relativeY - timelineConfig.editor.containerOffset.top;
+        scrollWhileDragging(event);
 
-        state.pointer.on_ms = (state.pointer.editorRelativeX - timelineConfig.editor.paddingLeft) / timelineConfig.cols.pixelPerMs;
+        // Pointer position inside the full editor content
+        state.pointer.editorRelativeX = state.pointer.relativeX + scrollPaneEl.scrollLeft;
+        state.pointer.editorRelativeY = state.pointer.relativeY + scrollPaneEl.scrollTop;
+
+        state.pointer.on_ms =
+            (state.pointer.editorRelativeX - timelineConfig.editor.paddingLeft) /
+            timelineConfig.cols.pixelPerMs;
 
         setPointerOverRow(state.pointer.editorRelativeY);
         setPlaceholderPosition();
-        scrollWhileDragging(event);
-        setFramePositions();
     }
 
     const setPlaceholderPosition = () => {
@@ -243,33 +264,6 @@ export const useDnd = ({
         state.draggingPlaceholder.start_ms =  start / timelineConfig.cols.pixelPerMs;
         state.draggingPlaceholder.end_ms = (start + state.draggingFrame.data!.width) / timelineConfig.cols.pixelPerMs;
     }
-
-    const setFramePositions = () => {
-        if(!state.draggingFrame.data) return;
-
-        //set initial position if not set yet
-        if(!state.draggingFrame.initial.sectionUuid || !state.draggingFrame.initial.rowUuid) {
-            state.draggingFrame.initial.sectionUuid = state.draggingFrame.data.sectionUuid;
-            state.draggingFrame.initial.rowUuid = state.draggingFrame.data.rowUuid;
-        }
-
-
-        const pointerOverSectionUuid = state.pointer.over.sectionUuid;
-        const pointerOverRowUuid = state.pointer.over.rowUuid;
-
-        const lastOverSectionUuid = state.draggingFrame.over.sectionUuid;
-        const lastOverRowUuid = state.draggingFrame.over.rowUuid;
-
-        const previousSectionUuid = state.draggingFrame.previous.sectionUuid;
-        const previousRowUuid = state.draggingFrame.previous.rowUuid;
-
-        //update previous over position
-        state.draggingFrame.previous.sectionUuid = lastOverSectionUuid !== pointerOverSectionUuid ? state.draggingFrame.over.sectionUuid : previousSectionUuid;
-        state.draggingFrame.previous.rowUuid = lastOverRowUuid !== pointerOverRowUuid ? state.draggingFrame.over.rowUuid : previousRowUuid;
-
-        state.draggingFrame.over.sectionUuid = pointerOverSectionUuid;
-        state.draggingFrame.over.rowUuid = pointerOverRowUuid;
-    }              
 
     const scrollWhileDragging = (event: PointerEvent) => {
         if(!state.dragging) return;
@@ -305,8 +299,8 @@ export const useDnd = ({
     const editorPointerEvents = {
         'pointerdown': startDrag,
         'pointermove': updateDraggingPositions,
-        'pointerup': dragEnd,
-        'pointercancel': dragEnd,
+        'pointerup': drop,
+        'pointercancel': cancelDrag,
     } as const;
 
     type eventTypes = keyof typeof editorPointerEvents;
@@ -338,36 +332,20 @@ export const useDnd = ({
 
     return {
         state,
-        startDrag,
-        dragEnd,
+        onDragStart: draggingEvents.onDragStart,
+        onDragEnd: draggingEvents.onDragEnd,
+        onDragCancel: draggingEvents.onDragCancel,
+        onDrop: draggingEvents.onDrop,
     };
 }
 
 export type UseDndType = ReturnType<typeof useDnd>;
-
-export interface DndInterface {
-    state: DndStateInterface,
-    startDrag: (event: PointerEvent, controls: PointerPressControls, frame: TimelineFrameByUuidInterface, container: HTMLDivElement | null, uuid: string | number ) => void,
-    dragEnd: (event: PointerEvent) => void,
-}
 
 export interface DndStateInterface {
     dragging: boolean,
     draggingFrame: {
         data: TimelineFrameByUuidInterface | null,
         uuid: string | number | null,
-        over: {
-            sectionUuid: string | number | null,
-            rowUuid: string | number | null,
-        },
-        previous: {
-            sectionUuid: string | number | null,
-            rowUuid: string | number | null,
-        },
-        initial: {
-            sectionUuid: string | number | null,
-            rowUuid: string | number | null,
-        }
     }
     container: {
         width: number,

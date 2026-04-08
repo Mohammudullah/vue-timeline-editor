@@ -128,6 +128,11 @@ import '../src/styles/basic-theme.css';
             }]"
         />
         <Dnd/>
-        <UseSnapping/>
+        <UseSnapping
+            @drag-start="(frame, event) => console.trace(frame, event)"
+            @drag-end="(frame, frameData, event) => console.trace(frame, frameData, event)"
+            @drag-cancel="(frame, frameData, event) => console.trace(frame, frameData, event)"
+            @drop="(frame, frameData, event) => console.trace(frame, frameData, event)"
+        />
     </Timeline>
 </template>

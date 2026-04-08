@@ -4,7 +4,15 @@ import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
 import { useSnapping } from '../../composables/features/snapping';
+import { TimelineFrameByUuidInterface } from '../../types/timeline';
+import { DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
 
+const emits = defineEmits<{
+    'dragStart': [frame: TimelineFrameByUuidInterface, event: PointerEvent],
+    'dragEnd': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'dragCancel': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'drop': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
+}>()
 
 const timeline = inject<UseTimelineInterface>('timeline');
 const timelineConfig = inject<TimelineConfigInterface>('timelineConfig');
@@ -20,9 +28,16 @@ if(!timeline || !timelineConfig || !features) {
     features.initFeature('snapping', () => useSnapping({ timeline, timelineConfig, dnd }));
 }
 
+const snapping = computed(() => features?.data.snapping ?? null);
+
 onUnmounted(() => {
     features?.destroyFeature('snapping');
 })
+
+snapping.value?.onDragStart((frame, event) => emits('dragStart', frame, event));
+snapping.value?.onDragEnd((frame, frameData, event) => emits('dragEnd', frame, frameData, event));
+snapping.value?.onDragCancel((frame, frameData, event) => emits('dragCancel', frame, frameData, event));
+snapping.value?.onDrop((frame, frameData, event) => emits('drop', frame, frameData, event));
 
 </script>
 

@@ -39,6 +39,15 @@ export interface TimelineFrameByUuidInterface {
     width: number,
 }
 
+export interface TimelineFrameByUuidBasicInterface {
+    uuid: string | number,
+    title: string | null,
+    start_ms: number,
+    end_ms: number,
+    rowUuid: string | number,
+    sectionUuid: string | number,
+}
+
 
 export interface TimelineSectionByUuidInterface {
     title: string,
