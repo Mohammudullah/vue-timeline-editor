@@ -164,7 +164,8 @@ onMounted(() => {
     </div>
 
      <pre>
-        {{ timeline.state.pointer }}
+        {{ features.data.snapping?.state.resizingPlaceholder }}
+
         <!-- {{ features.data.dnd?.state.draggingPlaceholder }}
         {{ features.data.snapping?.state.draggingPlaceholder }} -->
      </pre>

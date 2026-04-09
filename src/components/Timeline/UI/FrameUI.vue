@@ -52,6 +52,7 @@ watch(container, (newContainer) => {
             :class="{
                 'vtd__row-frame-selected': selected
             }"
+            style="overflow: hidden;"
             @click="emits('click', $event)"
         >
 

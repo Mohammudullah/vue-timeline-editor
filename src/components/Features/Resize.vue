@@ -1,9 +1,12 @@
 <script lang="ts" setup>
-import { computed, inject } from 'vue';
+import { computed, inject, onUnmounted, watch } from 'vue';
 import { useFeatures } from '../../composables/features/features';
 import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useResize } from '../../composables/features/resize';
+import { TimelineFrameByUuidInterface } from '../../types/timeline';
+import { ResizedFrameDataInterface } from '../../composables/features/draggingEvents';
+import FrameUI from '../Timeline/UI/FrameUI.vue';
 
 
 const props = withDefaults(defineProps<{
@@ -11,6 +14,13 @@ const props = withDefaults(defineProps<{
 }>(), {
     
 })
+
+const emits = defineEmits<{
+    'resizeStart': [frame: TimelineFrameByUuidInterface, event: PointerEvent],
+    'resizeEnd': [frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent],
+    'resized': [frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent],
+    'resizeCancel': [frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent],
+}>()
 
 
 const timeline = inject<UseTimelineInterface>('timeline');
@@ -28,6 +38,52 @@ if(!timeline || !timelineConfig || !features) {
 const frame = computed(() => features?.data.frame?.state.selected.frame ?? null);
 const resize = computed(() => features?.data.resize ?? null);
 
+const activeHandler = computed(() => features?.data.snapping || null);
+
+const handleResizeStart = (frame: TimelineFrameByUuidInterface, event: PointerEvent) => {
+    emits('resizeStart', frame, event);
+};
+
+const handleResizeEnd = (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => {
+    emits('resizeEnd', frame, frameData, event);
+};
+
+const handleResized = (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => {
+    emits('resized', frame, frameData, event);
+
+    //update frame position on drop
+    timeline?.updateFrame(frame.uuid, {
+        start_ms: frameData.current.start_ms,
+        end_ms: frameData.current.end_ms,
+        uuid: frame.uuid,
+        title: frame.title,
+        rowUuid: frameData.current.rowUuid ?? frame.rowUuid,
+        sectionUuid: frameData.current.sectionUuid ?? frame.sectionUuid,
+    });
+};
+
+const handleResizeCancel = (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => {
+    emits('resizeCancel', frame, frameData, event);
+};
+
+
+watch(activeHandler, (newHandler, oldHandler) => {
+
+    oldHandler?.removeEvent('resizeStart', 'activeHandlerOnResizeStart');
+    oldHandler?.removeEvent('resizeEnd', 'activeHandlerOnResizeEnd');
+    oldHandler?.removeEvent('resizeCancel', 'activeHandlerOnResizeCancel');
+    oldHandler?.removeEvent('resized', 'activeHandlerOnResized');
+
+    newHandler?.onResizeStart(handleResizeStart, 'activeHandlerOnResizeStart');
+    newHandler?.onResizeEnd(handleResizeEnd, 'activeHandlerOnResizeEnd');
+    newHandler?.onResized(handleResized, 'activeHandlerOnResized');
+    newHandler?.onResizeCancel(handleResizeCancel, 'activeHandlerOnResizeCancel');
+}, { immediate: true })
+
+onUnmounted(() => {
+    features?.destroyFeature('resize');
+})
+
 </script>
 
 <template>
@@ -35,22 +91,27 @@ const resize = computed(() => features?.data.resize ?? null);
         <div
             :style="{
                 height: timelineConfig?.rows.height + 'px',
-                top: 0,
-                left: 0,
+                top: activeHandler.state.resizingPlaceholder.top + 'px',
+                left: activeHandler.state.resizingPlaceholder.left + 'px',
                 position: 'absolute',
+                cursor: 'ew-resize',
             }"
-            v-if="frame && resize"
+            v-if="frame && resize && activeHandler && resize.state.resizing"
             class="vtd__resize-placeholder"
 
         >
             <FrameUI
-                :start-ms="resize.state.resizingPlaceholder.start_ms ?? frame.start_ms"
-                :end-ms="resize.state.resizingPlaceholder.end_ms ?? frame.end_ms"
+                :start-ms="activeHandler.state.resizingPlaceholder.start_ms ?? frame.start_ms"
+                :end-ms="activeHandler.state.resizingPlaceholder.end_ms ?? frame.end_ms"
                 :title="frame.title"
                 :left="0"
-                :width="resize.state.resizingPlaceholder.width ?? frame.width"
+                :width="activeHandler.state.resizingPlaceholder.width ?? frame.width"
                 :selected="true"
             />
         </div>
     </Teleport>
+
+    <pre>
+        {{ resize?.state.resizingPlaceholder }}
+    </pre>
 </template>

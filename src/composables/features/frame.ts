@@ -1,4 +1,4 @@
-import { reactive } from "vue";
+import { reactive, watch } from "vue";
 import { UseTimelineInterface } from "../timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
 import { TimelineFrameByUuidInterface } from "../../types/timeline";
@@ -45,12 +45,39 @@ export const useFrames = ({
         }
     }
 
+    const getFramePointerData = () => {
+
+        //calculate the pointer position relative to the container
+        const rect = state.selected.container?.getBoundingClientRect();
+
+        return {
+            width: state.selected.container?.clientWidth ?? 0,
+            height: state.selected.container?.clientHeight ?? 0,
+            pointerX: rect ? timeline.state.pointer.clientX - rect.left : 0,
+            pointerY: rect ? timeline.state.pointer.clientY - rect.top : 0,
+        }
+    }
+
+    watch(() => timeline.state.sectionFramesByUuid, (frames) => {
+        if(state.selected.uuid) {
+            const frame = frames[state.selected.uuid] ?? null;
+
+            if(frame) {
+                state.selected.frame = frame;
+            }
+            else {
+                deselectFrame();
+            }
+        }
+    }, { deep: true })
+
     return {
         state,
         selectFrame,
         deselectFrame,
         toggleFrame,
         syncSelectedContainer,
+        getFramePointerData
     }
 }
 

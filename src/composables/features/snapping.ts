@@ -5,21 +5,27 @@ import { UseFeaturesType } from "./features";
 import { UseDndType } from "./dnd";
 import { start } from "node:repl";
 import { TimelineFrameByUuidInterface } from "../../types/timeline";
-import { DraggedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
+import { DraggedFrameDataInterface, ResizedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
+import { UseResizeInterface } from "./resize";
+import useUtils from "../utils";
 
 export const useSnapping = ({
     timeline,
     timelineConfig,
     dnd,
+    resize,
 } : {
     timeline: UseTimelineInterface,
     timelineConfig: TimelineConfigInterface,
     dnd: Ref<UseDndType | null>,
+    resize: Ref<UseResizeInterface | null>,
 }) => {
 
     const dragging = computed(() => dnd.value?.state.dragging || false);
+    const resizing = computed(() => resize.value?.state.resizing || false);
     
     const draggingEvents = useDraggingEvents();
+    const { calculateFrameWidth } = useUtils();
 
     const activeRowCache = {
         emptyAreas: {
@@ -40,6 +46,13 @@ export const useSnapping = ({
             top: 0,
             start_ms: 0,
             end_ms: 0,
+        },
+        resizingPlaceholder: {
+            left: 0,
+            top: 0,
+            start_ms: 0,
+            end_ms: 0,
+            width: 0
         }
     });
 
@@ -134,9 +147,28 @@ export const useSnapping = ({
             }
         }
     }
+    
+    
+    const getResizingFrameData = () : ResizedFrameDataInterface => {
+
+        return {
+            initial: {
+                sectionUuid: resize.value?.state.resizingFrame.frame?.sectionUuid ?? null,
+                rowUuid: resize.value?.state.resizingFrame.frame?.rowUuid ?? null,
+                start_ms: resize.value?.state.resizingFrame.frame?.start_ms ?? 0,
+                end_ms: resize.value?.state.resizingFrame.frame?.end_ms ?? 0,
+            },
+            current: {
+                sectionUuid: resize.value?.state.resizingFrame.frame?.sectionUuid ?? null,
+                rowUuid: resize.value?.state.resizingFrame.frame?.rowUuid ?? null,
+                start_ms: state.resizingPlaceholder.start_ms,
+                end_ms: state.resizingPlaceholder.end_ms,
+            }
+        }
+    }
 
 
-    const snapRows = (top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
+    const snapRows = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
 
         const editorRelativeY = timeline.state.pointer.editorRelativeY ?? 0;
         const pointerOverRow = timeline.state.pointer.over.rowUuid ?? null;
@@ -163,18 +195,15 @@ export const useSnapping = ({
     // snap frames to empty areas in the row, this will help users to snap frames to existing empty areas in the row while dragging
     // also, this function will protect frames from being dragged to non-empty areas in the row 
 
-    const snapFrames = ( top: number | null, left: number | null, startMs: number | null, endMs: number | null ) => {
+    const snapFrames = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null ) => {
 
         const threshold = 150000; // in ms
-
-        const frameStartMs = dnd.value?.state.draggingPlaceholder.start_ms;
-        const frameEndMs = dnd.value?.state.draggingPlaceholder.end_ms;
 
         if (
             activeRowCache.emptyAreas.starts.length === 0 ||
             activeRowCache.emptyAreas.ends.length === 0 ||
-            frameStartMs === undefined ||
-            frameEndMs === undefined
+            dependency.frame.start_ms === undefined ||
+            dependency.frame.end_ms === undefined
         ) {
             return {
                 top,
@@ -184,7 +213,7 @@ export const useSnapping = ({
             };
         }
 
-        const duration = frameEndMs - frameStartMs;
+        const duration = dependency.frame.end_ms - dependency.frame.start_ms;
 
         let result: { type: 'start' | 'end'; value: number } | null = null;
 
@@ -192,7 +221,7 @@ export const useSnapping = ({
         let closestStart: { value: number; distance: number } | null = null;
 
         for (const s of activeRowCache.emptyAreas.starts) {
-            const distance = Math.abs(s - frameStartMs);
+            const distance = Math.abs(s - dependency.frame.start_ms);
 
             if (distance <= threshold && (!closestStart || distance < closestStart.distance)) {
                 closestStart = { value: s, distance };
@@ -209,7 +238,7 @@ export const useSnapping = ({
             let closestEnd: { value: number; distance: number } | null = null;
 
             for (const e of activeRowCache.emptyAreas.ends) {
-                const distance = Math.abs(e - frameEndMs);
+                const distance = Math.abs(e - dependency.frame.end_ms);
 
                 if (distance <= threshold && (!closestEnd || distance < closestEnd.distance)) {
                     closestEnd = { value: e, distance };
@@ -224,7 +253,7 @@ export const useSnapping = ({
             }
         }
 
-        let finalStart = frameStartMs;
+        let finalStart = dependency.frame.start_ms;
 
         // 🔥 Apply snapping
         if (result) {
@@ -243,7 +272,7 @@ export const useSnapping = ({
     };
 
 
-    const snapEdges = (top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
+    const snapEdges = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
         
 
         // edges calculates based on current timeline config and dragging frame dimensions
@@ -285,15 +314,13 @@ export const useSnapping = ({
         endMs: null as number | null,
     }
 
-    const protectOverLappingFrames = (top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
+    const protectOverLappingFrames = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
         
         // if pointer or frame any of them are over a frame, then return last position which is not overlapping, 
 
         const pointerOnMs = timeline.state.pointer.on_ms;
-        const frameStart = dnd.value?.state.draggingPlaceholder.start_ms;
-        const frameEnd = dnd.value?.state.draggingPlaceholder.end_ms;
 
-        if(pointerOnMs === undefined || frameStart === undefined || frameEnd === undefined) {
+        if(pointerOnMs === undefined || dependency.frame.start_ms === undefined || dependency.frame.end_ms === undefined) {
 
             lastNotOverflowedPosition.top = top;
             lastNotOverflowedPosition.left = left;
@@ -305,6 +332,12 @@ export const useSnapping = ({
         
         let pointerOverLapping = false;
         let frameOverLapping = false;
+        let overlappingFrameStart: number | undefined;
+        let overlappingFrameEnd: number | undefined;
+
+        const currentFrameUuid = dependency.event === 'resize'
+            ? resize.value?.state.resizingFrame.frame?.uuid
+            : dnd.value?.state.draggingFrame.data?.uuid;
 
         for(let i = 0; i <= activeRowCache.frames.starts.length; i++) {
 
@@ -312,26 +345,53 @@ export const useSnapping = ({
             const existingFrameEnd = activeRowCache.frames.ends[i];
             const existingFrameUuid = activeRowCache.frames.uuids[i];
 
-            if(existingFrameStart === undefined || existingFrameEnd === undefined || existingFrameUuid === undefined || existingFrameUuid === dnd.value?.state.draggingFrame.data?.uuid) {
+            if(existingFrameStart === undefined || existingFrameEnd === undefined || existingFrameUuid === undefined || existingFrameUuid === currentFrameUuid) {
                 continue;
             }
 
             //first check if pointer is over an existing frame
             if(pointerOnMs >= existingFrameStart && pointerOnMs <= existingFrameEnd) {
                 pointerOverLapping = true;
+                overlappingFrameStart = existingFrameStart;
+                overlappingFrameEnd = existingFrameEnd;
                 break;
             }
 
-            // then check if dragging frame is over an existing area
+            // then check if dragging frame is over an existing area (strict inequalities so adjacent/touching frames are not considered overlapping)
             if(
-                (frameStart >= existingFrameStart && frameStart <= existingFrameEnd) 
-                || (frameEnd >= existingFrameStart && frameEnd <= existingFrameEnd) 
-                || (frameStart <= existingFrameStart && frameEnd >= existingFrameEnd)
+                (dependency.frame.start_ms > existingFrameStart && dependency.frame.start_ms < existingFrameEnd) 
+                || (dependency.frame.end_ms > existingFrameStart && dependency.frame.end_ms < existingFrameEnd) 
+                || (dependency.frame.start_ms < existingFrameStart && dependency.frame.end_ms > existingFrameEnd)
             ) {
                 frameOverLapping = true;
+                overlappingFrameStart = existingFrameStart;
+                overlappingFrameEnd = existingFrameEnd;
                 break;
             }
 
+        }
+
+        // handle resize overlap: clamp the resizing edge to the overlapping frame's boundary
+        if(dependency.event === 'resize' && (frameOverLapping || pointerOverLapping) && overlappingFrameStart !== undefined && overlappingFrameEnd !== undefined) {
+            const side = dependency.interactionDirection;
+
+            if(side === 'right') {
+                // resizing from right, clamp endMs to the overlapping frame's start
+                const clampedEndMs = overlappingFrameStart;
+                lastNotOverflowedPosition.top = top;
+                lastNotOverflowedPosition.left = left;
+                lastNotOverflowedPosition.startMs = startMs;
+                lastNotOverflowedPosition.endMs = clampedEndMs;
+            } else if(side === 'left') {
+                // resizing from left, clamp startMs to the overlapping frame's end
+                const clampedStartMs = overlappingFrameEnd;
+                lastNotOverflowedPosition.top = top;
+                lastNotOverflowedPosition.left = (clampedStartMs * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
+                lastNotOverflowedPosition.startMs = clampedStartMs;
+                lastNotOverflowedPosition.endMs = endMs;
+            }
+
+            return lastNotOverflowedPosition;
         }
 
         //if frame is overlapping but point is in empty area try to snap to closest empty area edge based on pointer position
@@ -348,20 +408,30 @@ export const useSnapping = ({
                 const emptyAreaStart = activeRowCache.emptyAreas.starts[emptyAreaIndex];
                 const emptyAreaEnd = activeRowCache.emptyAreas.ends[emptyAreaIndex];
 
+                const duration = dependency.frame.end_ms - dependency.frame.start_ms;
                 const distanceToStart = Math.abs(pointerOnMs - emptyAreaStart);
                 const distanceToEnd = Math.abs(pointerOnMs - emptyAreaEnd);
                 const closestEdge = distanceToStart < distanceToEnd ? emptyAreaStart : emptyAreaEnd;
 
-                let newLeft = (closestEdge * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
+                let newStartMs: number;
+                let newEndMs: number;
 
                 if(closestEdge === emptyAreaEnd) {
-                    newLeft -= dnd.value?.state.draggingFrame.data?.width ?? 0;
+                    // snap frame's end to the empty area's end
+                    newEndMs = closestEdge;
+                    newStartMs = closestEdge - duration;
+                } else {
+                    // snap frame's start to the empty area's start
+                    newStartMs = closestEdge;
+                    newEndMs = closestEdge + duration;
                 }
+
+                const newLeft = (newStartMs * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
 
                 lastNotOverflowedPosition.top = top;
                 lastNotOverflowedPosition.left = newLeft;
-                lastNotOverflowedPosition.startMs = closestEdge;
-                lastNotOverflowedPosition.endMs = closestEdge + (frameEnd - frameStart);
+                lastNotOverflowedPosition.startMs = newStartMs;
+                lastNotOverflowedPosition.endMs = newEndMs;
 
                 return lastNotOverflowedPosition;
             }
@@ -386,7 +456,7 @@ export const useSnapping = ({
     }
 
 
-    const snapGuides = (top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
+    const snapGuides = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
         return {
             top,
             left,
@@ -396,7 +466,7 @@ export const useSnapping = ({
     }
 
 
-    const snapTimes = (top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
+    const snapTimesOnDrag = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
 
         //if frame is within snapping threshold to a time guide then snap to that time guide
         // the time guide positions are calculated based on timeline config's intervals of major grid and minor grid
@@ -407,10 +477,7 @@ export const useSnapping = ({
         const majorGridInterval = timelineConfig.cols.majorGridInterval;
         const minorGridInterval = timelineConfig.cols.minorGridInterval;
 
-        const frameStart = dnd.value?.state.draggingPlaceholder.start_ms;
-        const frameEnd = dnd.value?.state.draggingPlaceholder.end_ms;
-
-        if(frameStart === undefined || frameEnd === undefined) {
+        if(dependency.frame.start_ms === undefined || dependency.frame.end_ms === undefined) {
             return {
                 top,
                 left,
@@ -421,56 +488,65 @@ export const useSnapping = ({
 
 
         // check major grid snapping
-        const majorGridStart = Math.round(frameStart / majorGridInterval) * majorGridInterval;
-        const majorGridEnd = Math.round(frameEnd / majorGridInterval) * majorGridInterval;
+        const majorGridStart = Math.round(dependency.frame.start_ms / majorGridInterval) * majorGridInterval;
+        const majorGridEnd = Math.round(dependency.frame.end_ms / majorGridInterval) * majorGridInterval;
 
-        const distanceToMajorGridStart = Math.abs(frameStart - majorGridStart);
-        const distanceToMajorGridEnd = Math.abs(frameEnd - majorGridEnd);
+        const distanceToMajorGridStart = Math.abs(dependency.frame.start_ms - majorGridStart);
+        const distanceToMajorGridEnd = Math.abs(dependency.frame.end_ms - majorGridEnd);
 
         if(distanceToMajorGridStart <= majorGridIntervalThreshold) {
-            return {
+            
+            const data = {
                 top,
                 left: (majorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
                 startMs: majorGridStart,
-                endMs: majorGridStart + (frameEnd - frameStart),
+                endMs: majorGridStart + (dependency.frame.end_ms - dependency.frame.start_ms),
             }
+
+            return data;
         }
 
 
         if(distanceToMajorGridEnd <= majorGridIntervalThreshold) {
-            return {
+            const data = {
                 top,
-                left: ((majorGridEnd - (frameEnd - frameStart)) * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
-                startMs: majorGridEnd - (frameEnd - frameStart),
+                left: ((majorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms)) * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                startMs: majorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms),
                 endMs: majorGridEnd,
             }
+
+            return data;
         }
 
 
         // check minor grid snapping
-        const minorGridStart = Math.round(frameStart / minorGridInterval) * minorGridInterval;
-        const minorGridEnd = Math.round(frameEnd / minorGridInterval) * minorGridInterval;
+        const minorGridStart = Math.round(dependency.frame.start_ms / minorGridInterval) * minorGridInterval;
+        const minorGridEnd = Math.round(dependency.frame.end_ms / minorGridInterval) * minorGridInterval;
 
 
-        const distanceToMinorGridStart = Math.abs(frameStart - minorGridStart);
-        const distanceToMinorGridEnd = Math.abs(frameEnd - minorGridEnd);
+        const distanceToMinorGridStart = Math.abs(dependency.frame.start_ms - minorGridStart);
+        const distanceToMinorGridEnd = Math.abs(dependency.frame.end_ms - minorGridEnd);
 
         if(distanceToMinorGridStart <= minorGridIntervalThreshold) {
-            return {
+            const data = {
                 top,
                 left: (minorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
                 startMs: minorGridStart,
-                endMs: minorGridStart + (frameEnd - frameStart),
+                endMs: minorGridStart + (dependency.frame.end_ms - dependency.frame.start_ms),
             }
+
+            return data;
         }
 
         if(distanceToMinorGridEnd <= minorGridIntervalThreshold) {
-            return {
+            const data = {
                 top,
-                left: ((minorGridEnd - (frameEnd - frameStart)) * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
-                startMs: minorGridEnd - (frameEnd - frameStart),
+                left: ((minorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms)) * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                startMs: minorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms),
                 endMs: minorGridEnd,
             }
+
+            return data;
         }
 
 
@@ -480,20 +556,89 @@ export const useSnapping = ({
             startMs,
             endMs
         }
+    } 
+
+
+    const snapTimesOnResize = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
+
+        const majorGridIntervalThreshold = 15 * 60 * 1000;
+        const minorGridIntervalThreshold = 15 * 60 * 1000;
+
+        const majorGridInterval = timelineConfig.cols.majorGridInterval;
+        const minorGridInterval = timelineConfig.cols.minorGridInterval;
+
+        if(dependency.frame.start_ms === undefined || dependency.frame.end_ms === undefined) {
+            return { top, left, startMs, endMs }
+        }
+
+        const side = dependency.interactionDirection;
+
+        if(side === 'right') {
+            // snap end_ms only, keep start_ms and left unchanged
+
+            const majorGridEnd = Math.round(dependency.frame.end_ms / majorGridInterval) * majorGridInterval;
+            const distanceToMajorGridEnd = Math.abs(dependency.frame.end_ms - majorGridEnd);
+
+            if(distanceToMajorGridEnd <= majorGridIntervalThreshold) {
+                return { top, left, startMs, endMs: majorGridEnd }
+            }
+
+            const minorGridEnd = Math.round(dependency.frame.end_ms / minorGridInterval) * minorGridInterval;
+            const distanceToMinorGridEnd = Math.abs(dependency.frame.end_ms - minorGridEnd);
+
+            if(distanceToMinorGridEnd <= minorGridIntervalThreshold) {
+                return { top, left, startMs, endMs: minorGridEnd }
+            }
+
+        } else if(side === 'left') {
+            // snap start_ms only, keep end_ms unchanged
+
+            const majorGridStart = Math.round(dependency.frame.start_ms / majorGridInterval) * majorGridInterval;
+            const distanceToMajorGridStart = Math.abs(dependency.frame.start_ms - majorGridStart);
+
+            if(distanceToMajorGridStart <= majorGridIntervalThreshold) {
+                return {
+                    top,
+                    left: (majorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                    startMs: majorGridStart,
+                    endMs,
+                }
+            }
+
+            const minorGridStart = Math.round(dependency.frame.start_ms / minorGridInterval) * minorGridInterval;
+            const distanceToMinorGridStart = Math.abs(dependency.frame.start_ms - minorGridStart);
+
+            if(distanceToMinorGridStart <= minorGridIntervalThreshold) {
+                return {
+                    top,
+                    left: (minorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                    startMs: minorGridStart,
+                    endMs,
+                }
+            }
+        }
+
+        return { top, left, startMs, endMs }
     }
 
 
-    const pipeline = [
+    const dragSnapPipeline = [
         snapRows,
         snapFrames,
-        snapTimes,
+        snapTimesOnDrag,
         snapGuides,
         snapEdges,
         protectOverLappingFrames,
     ]
 
 
-    const snapPipeline = () => {
+    const resizeSnapPipeline = [
+        snapTimesOnResize,
+        protectOverLappingFrames,
+    ]
+
+
+    const snapOnDragPipeline = () => {
         if(!dnd.value || !dnd.value.state.dragging) return;
 
         const currentRowUuid = timeline.state.pointer.over.rowUuid;
@@ -510,8 +655,17 @@ export const useSnapping = ({
             endMs: null as number | null,
         }
 
-        pipeline.forEach((snapFunction) => {
-            snapPosition = snapFunction(snapPosition.top, snapPosition.left, snapPosition.startMs, snapPosition.endMs) as { top: number | null; left: number | null; startMs: number | null; endMs: number | null };
+        const dependency = {
+            frame: {
+                start_ms: dnd.value.state.draggingPlaceholder.start_ms,
+                end_ms: dnd.value.state.draggingPlaceholder.end_ms,
+                left: dnd.value.state.draggingPlaceholder.left,
+            },
+            event: 'drag',
+        } as SnapDependencyInterface;
+
+        dragSnapPipeline.forEach((snapFunction) => {
+            snapPosition = snapFunction(dependency, snapPosition.top, snapPosition.left, snapPosition.startMs, snapPosition.endMs) as { top: number | null; left: number | null; startMs: number | null; endMs: number | null };
 
         });
 
@@ -522,7 +676,44 @@ export const useSnapping = ({
         state.draggingPlaceholder.end_ms = snapPosition.endMs == null ? dnd.value?.state.draggingPlaceholder.end_ms ?? 0 : snapPosition.endMs;
     }
 
-    watch([() => timeline.state.pointer.clientX, () => timeline.state.pointer.clientY], snapPipeline, { deep: true });
+
+    const snapOnResizePipeline = () => {
+        if(!resize.value || !resize.value.state.resizing) return;
+
+        const currentRowUuid = resize.value.state.resizingFrame.frame?.rowUuid;
+        if(currentRowUuid && currentRowUuid != activeRowCache.rowUuid) {
+            cacheActiveRow(currentRowUuid);
+        }
+
+        let snapPosition = {
+            top: null as number | null,
+            left: null as number | null,
+            startMs: null as number | null,
+            endMs: null as number | null,
+        }
+
+        const dependency = {
+            frame: {
+                start_ms: resize.value.state.resizingPlaceholder.start_ms,
+                end_ms: resize.value.state.resizingPlaceholder.end_ms,
+            },
+            event: 'resize',
+            interactionDirection: resize.value.state.resizingFrame.side,
+        } as SnapDependencyInterface;
+
+        resizeSnapPipeline.forEach((snapFunction) => {
+            snapPosition = snapFunction(dependency, snapPosition.top, snapPosition.left, snapPosition.startMs, snapPosition.endMs) as { top: number | null; left: number | null; startMs: number | null; endMs: number | null };
+        });
+
+        state.resizingPlaceholder.top = snapPosition.top == null ? resize?.value?.state.resizingPlaceholder.top ?? 0 : snapPosition.top;
+        state.resizingPlaceholder.left = snapPosition.left == null ? resize.value?.state.resizingPlaceholder.left ?? 0 : snapPosition.left;
+        state.resizingPlaceholder.start_ms = snapPosition.startMs == null ? resize.value?.state.resizingPlaceholder.start_ms ?? 0 : snapPosition.startMs;
+        state.resizingPlaceholder.end_ms = snapPosition.endMs == null ? resize.value?.state.resizingPlaceholder.end_ms ?? 0 : snapPosition.endMs;
+        state.resizingPlaceholder.width = calculateFrameWidth(state.resizingPlaceholder.start_ms, state.resizingPlaceholder.end_ms, timelineConfig.cols.pixelPerMs);
+    }
+
+    watch([() => timeline.state.pointer.clientX, () => timeline.state.pointer.clientY, () => dnd.value?.state.dragging], snapOnDragPipeline, { deep: true });
+    watch([() => timeline.state.pointer.clientX, () => resize.value?.state.resizing], snapOnResizePipeline, { deep: true });
 
     watch(() => dnd.value?.state.dragging, (dragging) => {
         if(!dragging) {
@@ -538,12 +729,42 @@ export const useSnapping = ({
         }
     });
 
+    watch(() => resize.value?.state.resizing, (resizing) => {
+        if(!resizing) {
+            lastNotOverflowedPosition = {
+                top: null,
+                left: null,
+                startMs: null,
+                endMs: null,
+            }
+        }
+    });
+
 
     //manage dragging events based on dnd event
-    dnd.value?.onDragStart((frame, event) => draggingEvents.triggerOnDragStart(frame, event), 'snappingComposableOnDragStart');
-    dnd.value?.onDragEnd((frame, frameData, event) => draggingEvents.triggerOnDragEnd(frame, getDraggingFrameData(), event), 'snappingComposableOnDragEnd');
-    dnd.value?.onDragCancel((frame, frameData, event) => draggingEvents.triggerOnDragCancel(frame, getDraggingFrameData(), event), 'snappingComposableOnDragCancel');
-    dnd.value?.onDrop((frame, frameData, event) => draggingEvents.triggerOnDrop(frame, getDraggingFrameData(), event), 'snappingComposableOnDrop');
+    watch(dnd, (newDnd, oldDnd) => {
+        oldDnd?.removeEvent('dragStart', 'snappingComposableOnDragStart');
+        oldDnd?.removeEvent('dragEnd', 'snappingComposableOnDragEnd');
+        oldDnd?.removeEvent('dragCancel', 'snappingComposableOnDragCancel');
+        oldDnd?.removeEvent('drop', 'snappingComposableOnDrop');
+
+        newDnd?.onDragStart((frame, event) => draggingEvents.triggerOnDragStart(frame, event), 'snappingComposableOnDragStart');
+        newDnd?.onDragEnd((frame, frameData, event) => draggingEvents.triggerOnDragEnd(frame, getDraggingFrameData(), event), 'snappingComposableOnDragEnd');
+        newDnd?.onDragCancel((frame, frameData, event) => draggingEvents.triggerOnDragCancel(frame, getDraggingFrameData(), event), 'snappingComposableOnDragCancel');
+        newDnd?.onDrop((frame, frameData, event) => draggingEvents.triggerOnDrop(frame, getDraggingFrameData(), event), 'snappingComposableOnDrop');
+    }, { immediate: true })
+
+
+    watch(resize, (newResize, oldResize) => {
+        oldResize?.removeEvent('resizeStart', 'snappingComposableOnResizeStart');
+        oldResize?.removeEvent('resizeEnd', 'snappingComposableOnResizeEnd');
+        oldResize?.removeEvent('resizeCancel', 'snappingComposableOnResizeCancel');
+
+        newResize?.onResizeStart((frame, event) => draggingEvents.triggerOnResizeStart(frame, event), 'snappingComposableOnResizeStart');
+        newResize?.onResizeEnd((frame, frameData, event) => draggingEvents.triggerOnResizeEnd(frame, getResizingFrameData(), event), 'snappingComposableOnResizeEnd');
+        newResize?.onResized((frame, frameData, event) => draggingEvents.triggerOnResized(frame, getResizingFrameData(), event), 'snappingComposableOnResized');
+        newResize?.onResizeCancel((frame, frameData, event) => draggingEvents.triggerOnResizeCancel(frame, getResizingFrameData(), event), 'snappingComposableOnResizeCancel');
+    }, { immediate: true })
 
 
     return {
@@ -552,6 +773,12 @@ export const useSnapping = ({
         onDragEnd: draggingEvents.onDragEnd,
         onDragCancel: draggingEvents.onDragCancel,
         onDrop: draggingEvents.onDrop,
+
+        onResizeStart: draggingEvents.onResizeStart,
+        onResizeEnd: draggingEvents.onResizeEnd,
+        onResizeCancel: draggingEvents.onResizeCancel,
+        onResized: draggingEvents.onResized,
+
         removeEvent: draggingEvents.removeEvent,
     }
     
@@ -565,5 +792,24 @@ export interface SnappingStateInterface {
         top: number,
         start_ms: number,
         end_ms: number,
+    },
+    resizingPlaceholder: {
+        left: number,
+        top: number,
+        start_ms: number,
+        end_ms: number,
+        width: number,
     }
+}
+
+
+interface SnapDependencyInterface {
+    frame: {
+        start_ms: number,
+        end_ms: number,
+        left: number,
+        right: number,
+    },
+    event: 'drag' | 'resize',
+    interactionDirection: 'left' | 'right' | null,
 }

@@ -19,13 +19,14 @@ const timelineConfig = inject<TimelineConfigInterface>('timelineConfig');
 const features = inject<ReturnType<typeof useFeatures>>('features');
 
 const dnd = computed(() => features?.data.dnd ?? null);
+const resize = computed(() => features?.data.resize ?? null);
 
 if(!timeline || !timelineConfig || !features) {
     console.error('Timeline, TimelineConfig, and Features must be provided');
 } else if(features.data.snapping) {
     console.error('Snapping feature is already enabled. Please check if <Snapping/> is mounted multiple times.');
 } else {
-    features.initFeature('snapping', () => useSnapping({ timeline, timelineConfig, dnd }));
+    features.initFeature('snapping', () => useSnapping({ timeline, timelineConfig, dnd, resize }));
 }
 
 const snapping = computed(() => features?.data.snapping ?? null);

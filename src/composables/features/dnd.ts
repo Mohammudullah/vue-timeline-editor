@@ -1,8 +1,7 @@
-import { onBeforeUnmount, reactive, Reactive, watch } from "vue"
+import { onBeforeUnmount, reactive, watch } from "vue"
 import { TimelineFrameByUuidInterface } from "../../types/timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
 import { UseTimelineInterface } from "../timeline";
-import { PointerPressControls } from "../pointerPress";
 import { UseFrameInterface } from "./frame";
 import { DraggedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
 
@@ -63,16 +62,7 @@ export const useDnd = ({
 
 
     const setContainer = (container: HTMLDivElement) => {
-        if(container) {
-            state.container.width = container.clientWidth;
-            state.container.height = container.clientHeight;
-
-            //calculate the pointer position relative to the container
-            const rect = container.getBoundingClientRect();
-
-            state.container.pointerX = timeline.state.pointer.clientX - rect.left;
-            state.container.pointerY = timeline.state.pointer.clientY - rect.top;
-        }
+        state.container = frame.getFramePointerData();
     }
 
 
