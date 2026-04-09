@@ -288,6 +288,25 @@ export const useSnapping = ({
         // snap to edges if pointer is within threshold distance from edges
         // the top checks if the pointer is within the top and bottom edges, and left checks for left and right edges
         // the ultimate goal is to keep the dragging frame within the bounds of the editor container
+
+        const duration = dependency.frame.end_ms - dependency.frame.start_ms;
+
+        let clampedLeft = left;
+        let clampedStartMs = startMs;
+        let clampedEndMs = endMs;
+
+        if((dnd.value?.state.draggingPlaceholder.left ?? 0) < edges.left) {
+            clampedLeft = edges.left;
+            clampedStartMs = 0;
+            clampedEndMs = duration;
+        } else if((dnd.value?.state.draggingPlaceholder.left ?? 0) > edges.right) {
+            clampedLeft = edges.right;
+            // calculate startMs from the right edge pixel position
+            const rightEdgeStartMs = (edges.right - timelineConfig.editor.paddingLeft) / timelineConfig.cols.pixelPerMs;
+            clampedStartMs = rightEdgeStartMs;
+            clampedEndMs = rightEdgeStartMs + duration;
+        }
+
         const data = {
             top: (dnd.value?.state.draggingPlaceholder.top ?? 0) < edges.top 
             ? edges.top 
@@ -295,13 +314,9 @@ export const useSnapping = ({
                 ? edges.bottom
                 : top ),
 
-            left: (dnd.value?.state.draggingPlaceholder.left ?? 0) < edges.left
-            ? edges.left
-            : ((dnd.value?.state.draggingPlaceholder.left ?? 0) > edges.right
-                ? edges.right
-                : left ),
-            startMs,
-            endMs,
+            left: clampedLeft,
+            startMs: clampedStartMs,
+            endMs: clampedEndMs,
         }
 
         return data;
@@ -392,6 +407,24 @@ export const useSnapping = ({
             }
 
             return lastNotOverflowedPosition;
+        }
+
+        // for drag: block placement if frame duration doesn't fit in the empty area the pointer is over
+        if(dependency.event === 'drag') {
+            const duration = dependency.frame.end_ms - dependency.frame.start_ms;
+
+            const pointerEmptyAreaIndex = activeRowCache.emptyAreas.starts.findIndex((start, index) => {
+                const end = activeRowCache.emptyAreas.ends[index];
+                return pointerOnMs >= start && pointerOnMs <= end;
+            });
+
+            if(pointerEmptyAreaIndex !== -1) {
+                const emptyAreaDuration = activeRowCache.emptyAreas.ends[pointerEmptyAreaIndex] - activeRowCache.emptyAreas.starts[pointerEmptyAreaIndex];
+
+                if(duration > emptyAreaDuration) {
+                    return lastNotOverflowedPosition;
+                }
+            }
         }
 
         //if frame is overlapping but point is in empty area try to snap to closest empty area edge based on pointer position

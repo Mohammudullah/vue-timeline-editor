@@ -374,10 +374,12 @@ export const useTimeline = (
 
     onMounted(() => {
         editor.value?.addEventListener('pointermove', updatePointerPosition)
+        editor.value?.addEventListener('pointerdown', updatePointerPosition)
     })
 
     onBeforeUnmount(() => {
         editor.value?.removeEventListener('pointermove', updatePointerPosition)
+        editor.value?.removeEventListener('pointerdown', updatePointerPosition)
     })
 
     return {
