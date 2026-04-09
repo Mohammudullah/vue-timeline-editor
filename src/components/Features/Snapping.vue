@@ -34,10 +34,10 @@ onUnmounted(() => {
     features?.destroyFeature('snapping');
 })
 
-snapping.value?.onDragStart((frame, event) => emits('dragStart', frame, event));
-snapping.value?.onDragEnd((frame, frameData, event) => emits('dragEnd', frame, frameData, event));
-snapping.value?.onDragCancel((frame, frameData, event) => emits('dragCancel', frame, frameData, event));
-snapping.value?.onDrop((frame, frameData, event) => emits('drop', frame, frameData, event));
+snapping.value?.onDragStart((frame, event) => emits('dragStart', frame, event), 'snappingComponentOnDragStart');
+snapping.value?.onDragEnd((frame, frameData, event) => emits('dragEnd', frame, frameData, event), 'snappingComponentOnDragEnd');
+snapping.value?.onDragCancel((frame, frameData, event) => emits('dragCancel', frame, frameData, event), 'snappingComponentOnDragCancel');
+snapping.value?.onDrop((frame, frameData, event) => emits('drop', frame, frameData, event), 'snappingComponentOnDrop');
 
 </script>
 

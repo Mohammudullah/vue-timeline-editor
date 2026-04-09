@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Dnd from '../src/components/Features/Dnd.vue';
+import Resize from '../src/components/Features/Resize.vue';
 import Sections from '../src/components/Features/Sections.vue';
 import UseSnapping from '../src/components/Features/Snapping.vue';
 import Timeline from '../src/components/Timeline.vue';
@@ -128,11 +129,7 @@ import '../src/styles/basic-theme.css';
             }]"
         />
         <Dnd/>
-        <UseSnapping
-            @drag-start="(frame, event) => console.trace(frame, event)"
-            @drag-end="(frame, frameData, event) => console.trace(frame, frameData, event)"
-            @drag-cancel="(frame, frameData, event) => console.trace(frame, frameData, event)"
-            @drop="(frame, frameData, event) => console.trace(frame, frameData, event)"
-        />
+        <UseSnapping/>
+        <Resize/>
     </Timeline>
 </template>

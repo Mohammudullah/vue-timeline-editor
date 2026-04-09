@@ -138,8 +138,8 @@ export const useSnapping = ({
 
     const snapRows = (top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
 
-        const editorRelativeY = dnd.value?.state.pointer.editorRelativeY ?? 0;
-        const pointerOverRow = dnd.value?.state.pointer.over.rowUuid ?? null;
+        const editorRelativeY = timeline.state.pointer.editorRelativeY ?? 0;
+        const pointerOverRow = timeline.state.pointer.over.rowUuid ?? null;
 
         if(!pointerOverRow) {
             return {
@@ -289,7 +289,7 @@ export const useSnapping = ({
         
         // if pointer or frame any of them are over a frame, then return last position which is not overlapping, 
 
-        const pointerOnMs = dnd.value?.state.pointer.on_ms;
+        const pointerOnMs = timeline.state.pointer.on_ms;
         const frameStart = dnd.value?.state.draggingPlaceholder.start_ms;
         const frameEnd = dnd.value?.state.draggingPlaceholder.end_ms;
 
@@ -401,8 +401,8 @@ export const useSnapping = ({
         //if frame is within snapping threshold to a time guide then snap to that time guide
         // the time guide positions are calculated based on timeline config's intervals of major grid and minor grid
 
-        const majorGridIntervalThreshold = 200000; // in ms
-        const minorGridIntervalThreshold = 200000; // in ms
+        const majorGridIntervalThreshold = 15 * 60 * 1000; // in ms
+        const minorGridIntervalThreshold = 15 * 60 * 1000; // in ms
 
         const majorGridInterval = timelineConfig.cols.majorGridInterval;
         const minorGridInterval = timelineConfig.cols.minorGridInterval;
@@ -486,17 +486,17 @@ export const useSnapping = ({
     const pipeline = [
         snapRows,
         snapFrames,
+        snapTimes,
+        snapGuides,
         snapEdges,
         protectOverLappingFrames,
-        snapGuides,
-        snapTimes,
     ]
 
 
     const snapPipeline = () => {
         if(!dnd.value || !dnd.value.state.dragging) return;
 
-        const currentRowUuid = dnd.value.state.pointer.over.rowUuid;
+        const currentRowUuid = timeline.state.pointer.over.rowUuid;
 
         //first cache if it's new row
         if(currentRowUuid && currentRowUuid != activeRowCache.rowUuid) {
@@ -522,7 +522,7 @@ export const useSnapping = ({
         state.draggingPlaceholder.end_ms = snapPosition.endMs == null ? dnd.value?.state.draggingPlaceholder.end_ms ?? 0 : snapPosition.endMs;
     }
 
-    watch([() => dnd.value?.state.pointer], snapPipeline, { deep: true });
+    watch([() => timeline.state.pointer.clientX, () => timeline.state.pointer.clientY], snapPipeline, { deep: true });
 
     watch(() => dnd.value?.state.dragging, (dragging) => {
         if(!dragging) {
@@ -540,10 +540,10 @@ export const useSnapping = ({
 
 
     //manage dragging events based on dnd event
-    dnd.value?.onDragStart((frame, event) => draggingEvents.triggerOnDragStart(frame, event));
-    dnd.value?.onDragEnd((frame, frameData, event) => draggingEvents.triggerOnDragEnd(frame, getDraggingFrameData(), event));
-    dnd.value?.onDragCancel((frame, frameData, event) => draggingEvents.triggerOnDragCancel(frame, getDraggingFrameData(), event));
-    dnd.value?.onDrop((frame, frameData, event) => draggingEvents.triggerOnDrop(frame, getDraggingFrameData(), event));
+    dnd.value?.onDragStart((frame, event) => draggingEvents.triggerOnDragStart(frame, event), 'snappingComposableOnDragStart');
+    dnd.value?.onDragEnd((frame, frameData, event) => draggingEvents.triggerOnDragEnd(frame, getDraggingFrameData(), event), 'snappingComposableOnDragEnd');
+    dnd.value?.onDragCancel((frame, frameData, event) => draggingEvents.triggerOnDragCancel(frame, getDraggingFrameData(), event), 'snappingComposableOnDragCancel');
+    dnd.value?.onDrop((frame, frameData, event) => draggingEvents.triggerOnDrop(frame, getDraggingFrameData(), event), 'snappingComposableOnDrop');
 
 
     return {
@@ -552,6 +552,7 @@ export const useSnapping = ({
         onDragEnd: draggingEvents.onDragEnd,
         onDragCancel: draggingEvents.onDragCancel,
         onDrop: draggingEvents.onDrop,
+        removeEvent: draggingEvents.removeEvent,
     }
     
 }

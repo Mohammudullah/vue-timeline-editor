@@ -1,14 +1,16 @@
 <script lang="ts" setup>
 import { ref, watch } from 'vue';
 import useUtils from '../../../composables/utils';
-import { TimelineFrameByUuidInterface, TimelineFrameInterface } from '../../../types/timeline';
 
 
 const props = withDefaults(defineProps<{
     left: number,
     width: number,
-    frame: TimelineFrameByUuidInterface,
+    startMs: number,
+    endMs: number,
+    title: string | null,
     selected?: boolean,
+    showResizeHandle?: boolean,
 }>(), {
     
 })
@@ -52,25 +54,37 @@ watch(container, (newContainer) => {
             }"
             @click="emits('click', $event)"
         >
-            <div class="vtd__frame-drag-handle">
+
+            <div 
+                class="vtd__frame-resize-left-handle vtd__row-frame-resize-handle no-dragging"
+                v-if="showResizeHandle"
+            >
 
             </div>
+
             <div class="vtd__row-frame-title">
-                {{ frame.title }}
+                {{ title }}
             </div>
             <div class="vtd__row-frame-time">
                 {{ secondsToTimeString({
-                    seconds: frame.start_ms / 1000,
+                    seconds: startMs / 1000,
                     format: 'hh:mm:ss a'
                 }) }} - 
                 {{ secondsToTimeString({
-                    seconds: frame.end_ms / 1000,
+                    seconds: endMs / 1000,
                     format: 'hh:mm:ss a'
                 }) }}
 
             </div>
 
             <slot></slot>
+
+            <div 
+                class="vtd__frame-resize-right-handle vtd__row-frame-resize-handle no-dragging"
+                v-if="showResizeHandle"
+            >
+
+            </div>
         </div>
     </div>
 </template>

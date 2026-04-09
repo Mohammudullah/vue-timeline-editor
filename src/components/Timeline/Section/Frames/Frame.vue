@@ -38,7 +38,9 @@ const container = computed<HTMLDivElement | null>(() => frameUi.value?.container
         ref="frameUi"
         :left="frame.editorRelativeLeft"
         :width="frame.width"
-        :frame="frame"
+        :start-ms="frame.start_ms"
+        :end-ms="frame.end_ms"
+        :title="frame.title"
         @click="(event) => container ? emits('click', event, container, frame, uuid) : null"
         @container-update="(event) => container ? emits('containerUpdate', event, frame, uuid) : null"
         :style="{
@@ -46,6 +48,7 @@ const container = computed<HTMLDivElement | null>(() => frameUi.value?.container
         }"
         :selected="props.selected"
         v-if="!dragging"
+        :show-resize-handle="props.selected && !props.dragging"
     >
 
     </FrameUI>

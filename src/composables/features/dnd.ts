@@ -37,23 +37,6 @@ export const useDnd = ({
         draggingFrame: {
             data: null,
             uuid: null,
-        },
-        pointer: {
-            clientX: 0,
-            clientY: 0,
-
-            relativeX: 0,
-            relativeY: 0,
-
-            editorRelativeX: 0,
-            editorRelativeY: 0,
-
-            on_ms: 0,
-
-            over: {
-                sectionUuid: null as string | number | null,
-                rowUuid: null as string | number | null,
-            }
         }
     });
 
@@ -70,8 +53,8 @@ export const useDnd = ({
                 end_ms: state.draggingFrame.data?.end_ms ?? 0,
             },
             current: {
-                sectionUuid: state.pointer.over.sectionUuid,
-                rowUuid: state.pointer.over.rowUuid,
+                sectionUuid: timeline.state.pointer.over.sectionUuid,
+                rowUuid: timeline.state.pointer.over.rowUuid,
                 start_ms: state.draggingPlaceholder.start_ms,
                 end_ms: state.draggingPlaceholder.end_ms,
             }
@@ -87,63 +70,10 @@ export const useDnd = ({
             //calculate the pointer position relative to the container
             const rect = container.getBoundingClientRect();
 
-            state.container.pointerX = state.pointer.clientX - rect.left;
-            state.container.pointerY = state.pointer.clientY - rect.top;
+            state.container.pointerX = timeline.state.pointer.clientX - rect.left;
+            state.container.pointerY = timeline.state.pointer.clientY - rect.top;
         }
     }
-
-
-    const rowsCenterCache = [] as {
-        sectionUuid: string | number,
-        rowUuid: string | number,
-        center: number,
-    }[];
-
-
-
-    const calculateRowsCenterCache = () => {
-        Object.values(timeline.state.sectionRowsByUuid).forEach((row) => {
-            const center = row.editorRelativeTop + timelineConfig.rows.height / 2;
-            rowsCenterCache.push({
-                sectionUuid: row.sectionUuid,
-                rowUuid: row.uuid,
-                center,
-            });
-        });
-    }
-
-    // A binary search function to find the closest row center to the given y position
-    const setPointerOverRow = (y: number) => {
-        let top = 0;
-        let bottom = rowsCenterCache.length - 1;
-
-        while (top <= bottom) {
-            const mid = (top + bottom) >> 1;
-            const center = rowsCenterCache[mid].center;
-
-            if (center < y) top = mid + 1;
-            else if (center > y) bottom = mid - 1;
-            else {
-                const row = rowsCenterCache[mid];
-                state.pointer.over.sectionUuid = row.sectionUuid;
-                state.pointer.over.rowUuid = row.rowUuid;
-                return;
-            }
-        }
-
-        const l = rowsCenterCache[top];
-        const r = rowsCenterCache[bottom];
-
-        const row =
-            !l ? r :
-            !r ? l :
-            Math.abs(l.center - y) < Math.abs(r.center - y) ? l : r;
-
-        if (!row) return;
-
-        state.pointer.over.sectionUuid = row.sectionUuid;
-        state.pointer.over.rowUuid = row.rowUuid;
-    };
 
 
     const startDrag = (event: PointerEvent) => {
@@ -157,20 +87,18 @@ export const useDnd = ({
         if(!frame.state.selected.uuid || !frameContainer) return;
 
         // If the pointerdown event is not on the selected frame, do not start dragging
-        if(!frameContainer.contains(event.target as Node)) { 
+        // also check if .no-drag class is present in the event target or its parents, if yes do not start dragging
+        if(!frameContainer.contains(event.target as Node) || (event.target as HTMLElement).closest('.no-dragging') || (event.target as HTMLElement).classList.contains('no-dragging')) { 
             return;
         }
-
-        // cache the rows center positions for finding the closest row during dragging
-        calculateRowsCenterCache();
 
         state.dragging = true;
         state.draggingFrame.data = frame.state.selected.frame;
         state.draggingFrame.uuid = frame.state.selected.uuid;
 
-        updateDraggingPositions(event);
         setContainer(frameContainer);
         setPlaceholderPosition();
+        timeline.enableEdgeScrolling();
 
         if(timeline.state.editor) {
 
@@ -195,7 +123,7 @@ export const useDnd = ({
         if(!state.dragging) return;
 
         draggingEvents.triggerOnDrop(state.draggingFrame.data!, getDraggingFrameData(), event);
-        
+
         dragEnd(event);
     }
 
@@ -213,92 +141,28 @@ export const useDnd = ({
 
         draggingEvents.triggerOnDragEnd(state.draggingFrame.data!, getDraggingFrameData(), event);
 
-        //clear rows center cache
-        rowsCenterCache.length = 0;
-
         //clear dragging frame data
         state.draggingFrame.data = null;
         state.draggingFrame.uuid = null;
 
-        //clear pointer over data
-        state.pointer.over.sectionUuid = null;
-        state.pointer.over.rowUuid = null;
-    }
-
-    const updateDraggingPositions = (event: PointerEvent) => {
-        if(!state.dragging) return;
-
-        const scrollPaneEl = timeline.state.scrollPaneEl;
-        if(!scrollPaneEl) return;
-
-        const rect = scrollPaneEl.getBoundingClientRect();
-
-        state.pointer.clientX = event.clientX;
-        state.pointer.clientY = event.clientY;
-
-        // Pointer position inside the visible scroll pane
-        state.pointer.relativeX = event.clientX - rect.left;
-        state.pointer.relativeY = event.clientY - rect.top;
-
-        scrollWhileDragging(event);
-
-        // Pointer position inside the full editor content
-        state.pointer.editorRelativeX = state.pointer.relativeX + scrollPaneEl.scrollLeft;
-        state.pointer.editorRelativeY = state.pointer.relativeY + scrollPaneEl.scrollTop;
-
-        state.pointer.on_ms =
-            (state.pointer.editorRelativeX - timelineConfig.editor.paddingLeft) /
-            timelineConfig.cols.pixelPerMs;
-
-        setPointerOverRow(state.pointer.editorRelativeY);
-        setPlaceholderPosition();
+        timeline.disableEdgeScrolling();
     }
 
     const setPlaceholderPosition = () => {
+
+        if(!state.dragging) return;
         
-        state.draggingPlaceholder.left = state.pointer.editorRelativeX - state.container.pointerX;
-        state.draggingPlaceholder.top = state.pointer.editorRelativeY - state.container.pointerY;
+        state.draggingPlaceholder.left = timeline.state.pointer.editorRelativeX - state.container.pointerX;
+        state.draggingPlaceholder.top = timeline.state.pointer.editorRelativeY - state.container.pointerY;
 
         const start = state.draggingPlaceholder.left - timelineConfig.editor.paddingLeft;
 
         state.draggingPlaceholder.start_ms =  start / timelineConfig.cols.pixelPerMs;
         state.draggingPlaceholder.end_ms = (start + state.draggingFrame.data!.width) / timelineConfig.cols.pixelPerMs;
     }
-
-    const scrollWhileDragging = (event: PointerEvent) => {
-        if(!state.dragging) return;
-
-        const scrollPanEl = timeline.state.scrollPaneEl;
-
-        if(!scrollPanEl) return;
-
-        const rect = scrollPanEl.getBoundingClientRect();
-
-        const scrollThreshold = 50;
-
-        let scrollX = 0;
-        let scrollY = 0;
-        if(event.clientX - rect.left < scrollThreshold) {
-            scrollX = -10;
-        } else if(rect.right - event.clientX < scrollThreshold) {
-            scrollX = 10;
-        }
-
-        if(event.clientY - rect.top < scrollThreshold) {
-            scrollY = -10;
-        } else if(rect.bottom - event.clientY < scrollThreshold) {
-            scrollY = 10;
-        }
-
-        if(scrollX !== 0 || scrollY !== 0) {
-            scrollPanEl.scrollBy(scrollX, scrollY);
-        }
-
-    }
     
     const editorPointerEvents = {
         'pointerdown': startDrag,
-        'pointermove': updateDraggingPositions,
         'pointerup': drop,
         'pointercancel': cancelDrag,
     } as const;
@@ -322,6 +186,15 @@ export const useDnd = ({
 
     }, { immediate: true })
 
+
+    watch([
+        () => timeline.state.pointer.clientX,
+        () => timeline.state.pointer.clientY,
+    
+    ], () => {
+        setPlaceholderPosition();
+    })
+
     // Clean up event listeners on component unmount
     onBeforeUnmount(() => {
         timeline.state.editor 
@@ -336,6 +209,7 @@ export const useDnd = ({
         onDragEnd: draggingEvents.onDragEnd,
         onDragCancel: draggingEvents.onDragCancel,
         onDrop: draggingEvents.onDrop,
+        removeEvent: draggingEvents.removeEvent,
     };
 }
 
@@ -346,27 +220,12 @@ export interface DndStateInterface {
     draggingFrame: {
         data: TimelineFrameByUuidInterface | null,
         uuid: string | number | null,
-    }
+    },
     container: {
         width: number,
         height: number,
         pointerX: number,
         pointerY: number,
-    },
-    pointer: {
-        clientX: number,
-        clientY: number,
-        relativeX: number,
-        relativeY: number,
-        editorRelativeX: number,
-        editorRelativeY: number,
-
-        on_ms: number,
-
-        over: {
-            sectionUuid: string | number | null,
-            rowUuid: string | number | null,
-        }
     },
     draggingPlaceholder: {
         left: number,

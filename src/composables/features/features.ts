@@ -4,6 +4,7 @@ import { UseSnappingInterface } from "./snapping";
 import { useFrames, UseFrameInterface } from "./frame";
 import { UseTimelineInterface } from "../timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
+import { UseResizeInterface } from "./resize";
 
 export const useFeatures = ({
     timeline,
@@ -22,6 +23,7 @@ export const useFeatures = ({
     const features = reactive<FeaturesInterface>({
         dnd: null,
         snapping: null,
+        resize: null,
         frame,
     });
 
@@ -37,6 +39,8 @@ export const useFeatures = ({
             features.dnd = value() as UseDndType;
         } else if(feature === 'snapping') {
             features.snapping = value() as UseSnappingInterface;
+        } else if(feature === 'resize') {
+            features.resize = value() as UseResizeInterface;
         }
     }
 
@@ -49,6 +53,8 @@ export const useFeatures = ({
             features.dnd = null;
         } else if(feature === 'snapping') {
             features.snapping = null;
+        } else if(feature === 'resize') {
+            features.resize = null;
         }
     }
 
@@ -63,8 +69,9 @@ export interface FeaturesInterface {
     frame: UseFrameInterface,
     dnd: UseDndType | null,
     snapping: UseSnappingInterface | null,
+    resize: UseResizeInterface | null,
 }
 
 export type UseFeaturesType = ReturnType<typeof useFeatures>;
 
-export type InitFeatureType = UseDndType | UseSnappingInterface | UseFrameInterface;
+export type InitFeatureType = UseDndType | UseSnappingInterface | UseFrameInterface | UseResizeInterface;

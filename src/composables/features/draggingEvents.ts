@@ -3,38 +3,44 @@ import { TimelineFrameByUuidInterface } from "../../types/timeline";
 export const useDraggingEvents = () => {
 
     const events = {
-        'dragStart': [] as ((frame: TimelineFrameByUuidInterface, event: PointerEvent) => void)[],
-        'dragEnd': [] as ((frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void)[],
-        'dragCancel': [] as ((frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void)[],
-        'drop': [] as ((frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void)[],
+        'dragStart': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, event: PointerEvent) => void }[],
+        'dragEnd': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void }[],
+        'dragCancel': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void }[],
+        'drop': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void }[],
     }
 
-    const registerEvent = (type: keyof typeof events, handler: ((frame?: TimelineFrameByUuidInterface, frameData?: DraggedFrameDataInterface, event?: PointerEvent) => void)) => {
+    const registerEvent = (type: keyof typeof events, handler: ((frame?: TimelineFrameByUuidInterface, frameData?: DraggedFrameDataInterface, event?: PointerEvent) => void), id: string) => {
         if (events[type]) {
-            events[type].push(handler as any);
+            events[type].push({ id, handler } as any);
+        }
+    }
+
+    const removeEvent = (type: keyof typeof events, id: string) => {
+        if (events[type]) {
+            events[type] = events[type].filter(event => event.id !== id) as any;
         }
     }
 
     const triggerOnDragStart = (frame: TimelineFrameByUuidInterface, event: PointerEvent) => {
-        events['dragStart'].forEach(handler => handler(JSON.parse(JSON.stringify(frame)), event));
+        events['dragStart'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), event));
     }
 
     const triggerOnDragEnd = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-        events['dragEnd'].forEach(handler => handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
+        events['dragEnd'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
     }
 
     const triggerOnDragCancel = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-        events['dragCancel'].forEach(handler => handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
+        events['dragCancel'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
     }
 
     const triggerOnDrop = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-        events['drop'].forEach(handler => handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
+        events['drop'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
     }
 
-    const onDragStart = (handler: (frame: TimelineFrameByUuidInterface, event: PointerEvent) => void) => registerEvent('dragStart', handler as any);
-    const onDragEnd = (handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void) => registerEvent('dragEnd', handler as any);
-    const onDragCancel = (handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void) => registerEvent('dragCancel', handler as any);
-    const onDrop = (handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void) => registerEvent('drop', handler as any);
+    const onDragStart = (handler: (frame: TimelineFrameByUuidInterface, event: PointerEvent) => void, id: string) => registerEvent('dragStart', handler as any, id);
+    const onDragEnd = (handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void, id: string) => registerEvent('dragEnd', handler as any, id);
+    const onDragCancel = (handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void, id: string) => registerEvent('dragCancel', handler as any, id);
+    const onDrop = (handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void, id: string) => registerEvent('drop', handler as any, id);
 
     return {
         onDragStart,
@@ -45,6 +51,7 @@ export const useDraggingEvents = () => {
         triggerOnDragEnd,
         triggerOnDragCancel,
         triggerOnDrop,
+        removeEvent,
     }
 }
 

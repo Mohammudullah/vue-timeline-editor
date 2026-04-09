@@ -135,6 +135,7 @@
     height: 100%;
     padding: 10px;
     border-radius: 6px;
+    position: relative;
 }
 
 .vtd__row-frame-title {
@@ -149,6 +150,22 @@
 
 .vtd__row-frame-selected {
     outline: 1px solid rgb(0, 120, 215);
+}
+
+.vtd__row-frame-resize-handle {
+    position: absolute;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    cursor: ew-resize;
+}
+
+.vtd__frame-resize-left-handle {
+    left: 0;
+}
+
+.vtd__frame-resize-right-handle {
+    right: 0;
 }
 
 /**------------ Row Styles End ---------------**/ 

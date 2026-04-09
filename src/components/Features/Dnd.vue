@@ -7,6 +7,7 @@ import { useDnd, UseDndType } from '../../composables/features/dnd';
 import FrameUI from '../Timeline/UI/FrameUI.vue';
 import { TimelineFrameByUuidInterface } from '../../types/timeline';
 import { DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
+import { watch } from 'vue';
 
 const emits = defineEmits<{
     'dragStart': [frame: TimelineFrameByUuidInterface, event: PointerEvent],
@@ -48,8 +49,6 @@ const handleOnDragCancel = (frame: TimelineFrameByUuidInterface, frameData: Drag
 const handleOnDrop = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
     emits('drop', frame, frameData, event);
 
-    console.log('dropped frame', frame, frameData);
-
     //update frame position on drop
     timeline?.updateFrame(frame.uuid, {
         start_ms: frameData.current.start_ms,
@@ -62,10 +61,18 @@ const handleOnDrop = (frame: TimelineFrameByUuidInterface, frameData: DraggedFra
 };
 
 
-activeHandler.value?.onDragStart(handleOnDragStart);
-activeHandler.value?.onDragEnd(handleOnDragEnd);
-activeHandler.value?.onDragCancel(handleOnDragCancel);
-activeHandler.value?.onDrop(handleOnDrop);
+watch(activeHandler, (newHandler, oldHandler) => {
+
+    oldHandler?.removeEvent('dragStart', 'activeHandlerOnDragStart');
+    oldHandler?.removeEvent('dragEnd', 'activeHandlerOnDragEnd');
+    oldHandler?.removeEvent('dragCancel', 'activeHandlerOnDragCancel');
+    oldHandler?.removeEvent('drop', 'activeHandlerOnDrop');
+
+    newHandler?.onDragStart(handleOnDragStart, 'activeHandlerOnDragStart');
+    newHandler?.onDragEnd(handleOnDragEnd, 'activeHandlerOnDragEnd');
+    newHandler?.onDragCancel(handleOnDragCancel, 'activeHandlerOnDragCancel');
+    newHandler?.onDrop(handleOnDrop, 'activeHandlerOnDrop');
+})
 
 onUnmounted(() => {
     features?.destroyFeature('dnd');
@@ -95,7 +102,9 @@ onUnmounted(() => {
                 }"
             >
                 <FrameUI
-                    :frame="frame"
+                    :start-ms="activeHandler.state.draggingPlaceholder.start_ms ?? frame.start_ms"
+                    :end-ms="activeHandler.state.draggingPlaceholder.end_ms ?? frame.end_ms"
+                    :title="frame.title"
                     :left="0"
                     :width="dnd.state.container.width"
                     :selected="true"
