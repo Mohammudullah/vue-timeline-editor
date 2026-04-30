@@ -2,6 +2,7 @@
 import Dnd from '../src/components/Features/Dnd.vue';
 import Resize from '../src/components/Features/Resize.vue';
 import Sections from '../src/components/Features/Sections.vue';
+import SnapGuideLines from '../src/components/Features/SnapGuideLines.vue';
 import Snapping from '../src/components/Features/Snapping.vue';
 import Timeline from '../src/components/Timeline.vue';
 import '../src/styles/basic-theme.css';
@@ -131,5 +132,6 @@ import '../src/styles/basic-theme.css';
         <Dnd/>
         <Snapping/>
         <Resize/>
+        <SnapGuideLines/>
     </Timeline>
 </template>

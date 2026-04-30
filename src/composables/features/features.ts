@@ -5,6 +5,7 @@ import { useFrames, UseFrameInterface } from "./frame";
 import { UseTimelineInterface } from "../timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
 import { UseResizeInterface } from "./resize";
+import { UseSnapGuideLinesType } from "./snapGuideLines";
 
 export const useFeatures = ({
     timeline,
@@ -24,6 +25,7 @@ export const useFeatures = ({
         dnd: null,
         snapping: null,
         resize: null,
+        snapGuideLines: null,
         frame,
     });
 
@@ -41,6 +43,8 @@ export const useFeatures = ({
             features.snapping = value() as UseSnappingInterface;
         } else if(feature === 'resize') {
             features.resize = value() as UseResizeInterface;
+        } else if(feature === 'snapGuideLines') {
+            features.snapGuideLines = value() as UseSnapGuideLinesType;
         }
     }
 
@@ -55,6 +59,8 @@ export const useFeatures = ({
             features.snapping = null;
         } else if(feature === 'resize') {
             features.resize = null;
+        } else if(feature === 'snapGuideLines') {
+            features.snapGuideLines = null;
         }
     }
 
@@ -70,8 +76,9 @@ export interface FeaturesInterface {
     dnd: UseDndType | null,
     snapping: UseSnappingInterface | null,
     resize: UseResizeInterface | null,
+    snapGuideLines: UseSnapGuideLinesType | null,
 }
 
 export type UseFeaturesType = ReturnType<typeof useFeatures>;
 
-export type InitFeatureType = UseDndType | UseSnappingInterface | UseFrameInterface | UseResizeInterface;
+export type InitFeatureType = UseDndType | UseSnappingInterface | UseFrameInterface | UseResizeInterface | UseSnapGuideLinesType;

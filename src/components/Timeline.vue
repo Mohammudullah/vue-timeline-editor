@@ -140,6 +140,8 @@ onMounted(() => {
                     }"
                 >
 
+                    <div id="editorBackgroundTeleports" class="vtd__editor-background-teleports"></div>
+
                     <div 
                         class="vtd__timeline-sections"
                     >

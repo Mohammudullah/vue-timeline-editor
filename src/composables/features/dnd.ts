@@ -8,11 +8,13 @@ import { DraggedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
 export const useDnd = ({
     timeline,
     timelineConfig,
-    frame
+    frame,
+    edgeSnap = true,
 } : {
     timeline: UseTimelineInterface,
     timelineConfig: TimelineConfigInterface,
-    frame: UseFrameInterface
+    frame: UseFrameInterface,
+    edgeSnap?: boolean,
 
 }) => {
 
@@ -142,8 +144,29 @@ export const useDnd = ({
 
         if(!state.dragging) return;
         
-        state.draggingPlaceholder.left = timeline.state.pointer.editorRelativeX - state.container.pointerX;
-        state.draggingPlaceholder.top = timeline.state.pointer.editorRelativeY - state.container.pointerY;
+        let left = timeline.state.pointer.editorRelativeX - state.container.pointerX;
+        let top = timeline.state.pointer.editorRelativeY - state.container.pointerY;
+
+        // Clamp the freeform ghost inside the editor bounds.
+        // Done here (not in snapping) so the ghost preview itself never escapes the
+        // editor — both the freeform ghost and the snap suggestion need this.
+        if(edgeSnap && state.draggingFrame.data) {
+            const frameWidth = state.draggingFrame.data.width;
+
+            const minLeft = timelineConfig.editor.paddingLeft;
+            const maxLeft = timelineConfig.editor.width - (timelineConfig.editor.paddingRight + frameWidth);
+            const minTop = timelineConfig.sections.labelHeight;
+            const maxTop = timelineConfig.editor.height - timelineConfig.rows.height;
+
+            if(left < minLeft) left = minLeft;
+            else if(left > maxLeft) left = maxLeft;
+
+            if(top < minTop) top = minTop;
+            else if(top > maxTop) top = maxTop;
+        }
+
+        state.draggingPlaceholder.left = left;
+        state.draggingPlaceholder.top = top;
 
         const start = state.draggingPlaceholder.left - timelineConfig.editor.paddingLeft;
 

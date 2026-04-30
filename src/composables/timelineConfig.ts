@@ -9,7 +9,7 @@ export const useTimelineConfig = (
         scrollPaneEl,
         direction = 'horizontal',
         zoom = 1,
-        colsLabelHeight = 40,
+        colsLabelHeight = 60,
         rowsLabelWidth = 100,
         timeAxisTimeFormat,
         initialRange,
@@ -72,11 +72,11 @@ export const useTimelineConfig = (
             labelHeight: colsLabelHeight,
         },
         rows: {
-            height: 60,
+            height: 40,
             labelWidth: rowsLabelWidth,
         },
         sections: {
-            labelHeight: 30,
+            labelHeight: 50,
         },
         timeAxis: {
             timeFormat: timeAxisTimeFormat,

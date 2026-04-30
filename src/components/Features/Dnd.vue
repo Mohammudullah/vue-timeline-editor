@@ -9,6 +9,12 @@ import { TimelineFrameByUuidInterface } from '../../types/timeline';
 import { DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
 import { watch } from 'vue';
 
+const props = withDefaults(defineProps<{
+    edgeSnap?: boolean,
+}>(), {
+    edgeSnap: true,
+});
+
 const emits = defineEmits<{
     'dragStart': [frame: TimelineFrameByUuidInterface, event: PointerEvent],
     'dragEnd': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
@@ -25,7 +31,7 @@ if(!timeline || !timelineConfig || !features) {
 } else if(features.data.dnd) {
     console.error('Dnd feature is already enabled. Please check if <Dnd/> is mounted multiple times.');
 } else {
-    features.initFeature('dnd', () => useDnd({ timeline, timelineConfig, frame: features.data.frame }));
+    features.initFeature('dnd', () => useDnd({ timeline, timelineConfig, frame: features.data.frame, edgeSnap: props.edgeSnap }));
 }
 
 const frame = computed(() => features?.data.dnd?.state.draggingFrame.data);
@@ -82,28 +88,34 @@ onUnmounted(() => {
 
 <template>
 
+    <!--
+        Freeform ghost preview.
+        Follows the raw pointer position via dnd.state.draggingPlaceholder; no
+        snapping is applied here so the user feels full control while dragging.
+    -->
     <Teleport to="#editorAreaTeleports" defer>
         <div
             :style="{
-                transform: `translateY(${activeHandler.state.draggingPlaceholder.top}px)`,
+                transform: `translateY(${dnd.state.draggingPlaceholder.top}px)`,
                 height: dnd.state.container.height + 'px',
                 top: 0,
                 left: 0,
                 position: 'absolute',
+                zIndex: 1
             }"
-            v-if="frame && dnd && activeHandler"
+            v-if="frame && dnd"
             class="vtd__dragging-placeholder"
 
         >
             <div
                 :style="{
-                    transform: `translateX(${activeHandler.state.draggingPlaceholder.left}px)`,
+                    transform: `translateX(${dnd.state.draggingPlaceholder.left}px)`,
                     height: '100%',
                 }"
             >
                 <FrameUI
-                    :start-ms="activeHandler.state.draggingPlaceholder.start_ms ?? frame.start_ms"
-                    :end-ms="activeHandler.state.draggingPlaceholder.end_ms ?? frame.end_ms"
+                    :start-ms="dnd.state.draggingPlaceholder.start_ms ?? frame.start_ms"
+                    :end-ms="dnd.state.draggingPlaceholder.end_ms ?? frame.end_ms"
                     :title="frame.title"
                     :left="0"
                     :width="dnd.state.container.width"
@@ -111,5 +123,40 @@ onUnmounted(() => {
                 />
             </div>
         </div>
+
+        <!--
+            Drop-target highlighter.
+            Visualizes where the dragged frame will land (suggestion area).
+            Exposed as a named slot so consumers can fully replace it.
+            For now positioned from activeHandler.state.draggingPlaceholder; will be
+            rewired to a dedicated suggestion state in a later step.
+        -->
+        <div
+            v-if="frame && dnd && activeHandler"
+            class="vtd__drag-highlighter"
+            :style="{
+                transform: `translate(${activeHandler.state.draggingPlaceholder.left}px, ${activeHandler.state.draggingPlaceholder.top}px)`,
+                width: dnd.state.container.width + 'px',
+                height: dnd.state.container.height + 'px',
+                top: 0,
+                left: 0,
+                position: 'absolute',
+                pointerEvents: 'none',
+            }"
+        >
+            <slot
+                name="highlighter"
+                :top="activeHandler.state.draggingPlaceholder.top"
+                :left="activeHandler.state.draggingPlaceholder.left"
+                :width="dnd.state.container.width"
+                :height="dnd.state.container.height"
+                :start-ms="activeHandler.state.draggingPlaceholder.start_ms"
+                :end-ms="activeHandler.state.draggingPlaceholder.end_ms"
+            >
+                <div class="vtd__drag-highlighter__default" />
+            </slot>
+        </div>
     </Teleport>
+
+    
 </template>

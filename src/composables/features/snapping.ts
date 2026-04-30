@@ -271,56 +271,6 @@ export const useSnapping = ({
     };
 
 
-    const snapEdges = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
-        
-
-        // edges calculates based on current timeline config and dragging frame dimensions
-        // this helps to snap to edges of editor container and also prevent dragging frame out of bounds
-        const edges = {
-            top: timelineConfig.sections.labelHeight,
-            bottom: timelineConfig.editor.height - timelineConfig.rows.height,
-            left: timelineConfig.editor.paddingLeft,
-            right: timelineConfig.editor.width - (timelineConfig.editor.paddingRight + (dnd.value?.state.draggingFrame.data?.width ?? 0)),
-        }
-
-
-        // snap to edges if pointer is within threshold distance from edges
-        // the top checks if the pointer is within the top and bottom edges, and left checks for left and right edges
-        // the ultimate goal is to keep the dragging frame within the bounds of the editor container
-
-        const duration = dependency.frame.end_ms - dependency.frame.start_ms;
-
-        let clampedLeft = left;
-        let clampedStartMs = startMs;
-        let clampedEndMs = endMs;
-
-        if((dnd.value?.state.draggingPlaceholder.left ?? 0) < edges.left) {
-            clampedLeft = edges.left;
-            clampedStartMs = 0;
-            clampedEndMs = duration;
-        } else if((dnd.value?.state.draggingPlaceholder.left ?? 0) > edges.right) {
-            clampedLeft = edges.right;
-            // calculate startMs from the right edge pixel position
-            const rightEdgeStartMs = (edges.right - timelineConfig.editor.paddingLeft) / timelineConfig.cols.pixelPerMs;
-            clampedStartMs = rightEdgeStartMs;
-            clampedEndMs = rightEdgeStartMs + duration;
-        }
-
-        const data = {
-            top: (dnd.value?.state.draggingPlaceholder.top ?? 0) < edges.top 
-            ? edges.top 
-            : ((dnd.value?.state.draggingPlaceholder.top ?? 0) > edges.bottom
-                ? edges.bottom
-                : top ),
-
-            left: clampedLeft,
-            startMs: clampedStartMs,
-            endMs: clampedEndMs,
-        }
-
-        return data;
-    }
-
     let lastNotOverflowedPosition = {
         top: null as number | null,
         left: null as number | null,
@@ -659,7 +609,6 @@ export const useSnapping = ({
         snapFrames,
         snapTimesOnDrag,
         snapGuides,
-        snapEdges,
         protectOverLappingFrames,
     ]
 
