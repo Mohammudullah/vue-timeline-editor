@@ -110,8 +110,4 @@ onUnmounted(() => {
             />
         </div>
     </Teleport>
-
-    <pre>
-        {{ resize?.state.resizingPlaceholder }}
-    </pre>
 </template>

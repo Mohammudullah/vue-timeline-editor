@@ -43,5 +43,5 @@ snapping.value?.onDrop((frame, frameData, event) => emits('drop', frame, frameDa
 </script>
 
 <template>
-    {{ features?.data.snapping?.state.draggingPlaceholder }}
+    
 </template>

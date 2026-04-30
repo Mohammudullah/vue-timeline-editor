@@ -164,7 +164,6 @@ onMounted(() => {
     </div>
 
      <pre>
-        {{ features.data.snapping?.state.resizingPlaceholder }}
 
         <!-- {{ features.data.dnd?.state.draggingPlaceholder }}
         {{ features.data.snapping?.state.draggingPlaceholder }} -->

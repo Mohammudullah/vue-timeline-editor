@@ -2,7 +2,7 @@
 import Dnd from '../src/components/Features/Dnd.vue';
 import Resize from '../src/components/Features/Resize.vue';
 import Sections from '../src/components/Features/Sections.vue';
-import UseSnapping from '../src/components/Features/Snapping.vue';
+import Snapping from '../src/components/Features/Snapping.vue';
 import Timeline from '../src/components/Timeline.vue';
 import '../src/styles/basic-theme.css';
 
@@ -129,7 +129,7 @@ import '../src/styles/basic-theme.css';
             }]"
         />
         <Dnd/>
-        <UseSnapping/>
+        <Snapping/>
         <Resize/>
     </Timeline>
 </template>

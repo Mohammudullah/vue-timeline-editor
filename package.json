@@ -40,7 +40,11 @@
         "dist"
     ],
     "sideEffects": [
-        "*.css"
+        "*.css",
+        "dist/index.js",
+        "dist/index.cjs",
+        "dist/timeline.js",
+        "dist/timeline.cjs"
     ],
     "scripts": {
         "dev": "vite",
