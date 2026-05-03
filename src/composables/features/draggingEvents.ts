@@ -94,33 +94,20 @@ export const useDraggingEvents = () => {
 }
 
 
-export interface DraggedFrameDataInterface {
-    initial: {
-        sectionUuid: string | number | null,
-        rowUuid: string | number | null,
-        start_ms: number,
-        end_ms: number,
-    },
-    current: {
-        sectionUuid: string | number | null,
-        rowUuid: string | number | null,
-        start_ms: number,
-        end_ms: number,
+export interface FrameDataItem {
+    uuid: string | number,
+    sectionUuid: string | number | null,
+    rowUuid: string | number | null,
+    start_ms: number,
+    end_ms: number,
+}
 
-    }
+export interface DraggedFrameDataInterface {
+    initial: FrameDataItem[],
+    current: FrameDataItem[],
 }
 
 export interface ResizedFrameDataInterface {
-    initial: {
-        sectionUuid: string | number | null,
-        rowUuid: string | number | null,
-        start_ms: number,
-        end_ms: number,
-    },
-    current: {
-        sectionUuid: string | number | null,
-        rowUuid: string | number | null,
-        start_ms: number,
-        end_ms: number,
-    }
+    initial: FrameDataItem[],
+    current: FrameDataItem[],
 }

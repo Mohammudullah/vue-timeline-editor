@@ -258,8 +258,26 @@ export const useTimeline = (
 
 
     const updateFrame = (uuid: string | number, frame: TimelineFrameByUuidBasicInterface) => {
+        // Capture the frame's previous row before re-registering, so we can
+        // refresh empty areas for both old and new rows when the frame moves
+        // between rows.
+        const previousRowUuid = state.sectionFramesByUuid[uuid]?.rowUuid;
+
         registerFrame(renderFrame(frame, frame.rowUuid, frame.sectionUuid), true);
 
+        // Recompute empty areas for affected rows. Without this, downstream
+        // snapping caches would keep using empty areas calculated from the
+        // frame's pre-update position, leading to wrong overlap/snap decisions
+        // when subsequent frames are dragged onto the same row.
+        const rangeEnd = config.range.end_seconds * 1000;
+        const refreshRow = (rowUuid: string | number) => {
+            const row = state.sectionRowsByUuid[rowUuid];
+            if (row) row.emptyAreas = getEmptyAreasOfRow(rowUuid, 0, rangeEnd);
+        };
+        refreshRow(frame.rowUuid);
+        if (previousRowUuid != null && previousRowUuid !== frame.rowUuid) {
+            refreshRow(previousRowUuid);
+        }
     }
 
 

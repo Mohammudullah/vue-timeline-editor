@@ -3,7 +3,7 @@ import { TimelineFrameByUuidInterface } from "../../types/timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
 import { UseTimelineInterface } from "../timeline";
 import { UseFrameInterface } from "./frame";
-import { DraggedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
+import { DraggedFrameDataInterface, FrameDataItem, useDraggingEvents } from "./draggingEvents";
 
 export const useDnd = ({
     timeline,
@@ -30,19 +30,17 @@ export const useDnd = ({
             pointerX: 0,
             pointerY: 0,
         },
-        draggingPlaceholder: {
-            left: 0, 
-            top: 0,
-            start_ms: 0,
-            end_ms: 0,
-            // When true, vertical position is locked to the original row.
-            // Set externally by features that enforce row constraints (e.g. JoinRows).
-            row_locked: false,
-        },
+        // When true, vertical position is locked to the original row.
+        // Set externally by features that enforce row constraints (e.g. JoinRows).
+        rowLocked: false,
         draggingFrame: {
             data: null,
             uuid: null,
-        }
+        },
+        // Map of active ghost placeholders keyed by frame uuid.
+        // Always contains the primary frame while dragging; external features
+        // (e.g. JoinRows) add further entries for group members.
+        draggingPlaceholders: {},
     });
 
 
@@ -50,20 +48,40 @@ export const useDnd = ({
 
 
     const getDraggingFrameData = () : DraggedFrameDataInterface => {
-        return {
-            initial: {
-                sectionUuid: state.draggingFrame.data?.sectionUuid ?? null,
-                rowUuid: state.draggingFrame.data?.rowUuid ?? null,
-                start_ms: state.draggingFrame.data?.start_ms ?? 0,
-                end_ms: state.draggingFrame.data?.end_ms ?? 0,
-            },
-            current: {
-                sectionUuid: timeline.state.pointer.over.sectionUuid,
-                rowUuid: timeline.state.pointer.over.rowUuid,
-                start_ms: state.draggingPlaceholder.start_ms,
-                end_ms: state.draggingPlaceholder.end_ms,
-            }
-        }
+        const primaryUuid = state.draggingFrame.uuid;
+
+        const initial: DraggedFrameDataInterface['initial'] = [];
+        const current: DraggedFrameDataInterface['current'] = [];
+
+        // Sort so primary is always first; members follow.
+        const entries = Object.values(state.draggingPlaceholders).sort((a, b) =>
+            a.uuid === primaryUuid ? -1 : b.uuid === primaryUuid ? 1 : 0
+        );
+
+        entries.forEach(entry => {
+            const originalFrame = timeline.state.sectionFramesByUuid[entry.uuid];
+            initial.push({
+                uuid: entry.uuid,
+                sectionUuid: originalFrame?.sectionUuid ?? null,
+                rowUuid: originalFrame?.rowUuid ?? null,
+                start_ms: originalFrame?.start_ms ?? 0,
+                end_ms: originalFrame?.end_ms ?? 0,
+            });
+            const isPrimary = entry.uuid === primaryUuid;
+            current.push({
+                uuid: entry.uuid,
+                sectionUuid: isPrimary
+                    ? timeline.state.pointer.over.sectionUuid
+                    : (originalFrame?.sectionUuid ?? null),
+                rowUuid: isPrimary
+                    ? timeline.state.pointer.over.rowUuid
+                    : entry.rowUuid,
+                start_ms: entry.start_ms,
+                end_ms: entry.end_ms,
+            });
+        });
+
+        return { initial, current };
     }
 
 
@@ -157,6 +175,8 @@ export const useDnd = ({
         state.draggingFrame.data = null;
         state.draggingFrame.uuid = null;
 
+        state.draggingPlaceholders = {};
+
         timeline.disableEdgeScrolling();
     }
 
@@ -167,10 +187,9 @@ export const useDnd = ({
         let left = timeline.state.pointer.editorRelativeX - state.container.pointerX;
         let top = timeline.state.pointer.editorRelativeY - state.container.pointerY;
 
-        // Row-lock: when an external feature (e.g. JoinRows) sets row_locked = true,
-        // override top with the original row's editorRelativeTop so the ghost
-        // always stays on the source row regardless of vertical pointer movement.
-        if (state.draggingPlaceholder.row_locked) {
+        // Row-lock: when rowLocked is true, override top with the original row's
+        // editorRelativeTop so the ghost stays on the source row.
+        if (state.rowLocked) {
             const originalRowUuid = state.draggingFrame.data?.rowUuid;
             const originalRow = originalRowUuid != null
                 ? timeline.state.sectionRowsByUuid[originalRowUuid]
@@ -181,8 +200,6 @@ export const useDnd = ({
         }
 
         // Clamp the freeform ghost inside the editor bounds.
-        // Done here (not in snapping) so the ghost preview itself never escapes the
-        // editor — both the freeform ghost and the snap suggestion need this.
         if(edgeSnap && state.draggingFrame.data) {
             const frameWidth = state.draggingFrame.data.width;
 
@@ -198,13 +215,21 @@ export const useDnd = ({
             else if(top > maxTop) top = maxTop;
         }
 
-        state.draggingPlaceholder.left = left;
-        state.draggingPlaceholder.top = top;
+        const start = left - timelineConfig.editor.paddingLeft;
+        const start_ms = start / timelineConfig.cols.pixelPerMs;
+        const end_ms = (start + state.draggingFrame.data!.width) / timelineConfig.cols.pixelPerMs;
 
-        const start = state.draggingPlaceholder.left - timelineConfig.editor.paddingLeft;
-
-        state.draggingPlaceholder.start_ms =  start / timelineConfig.cols.pixelPerMs;
-        state.draggingPlaceholder.end_ms = (start + state.draggingFrame.data!.width) / timelineConfig.cols.pixelPerMs;
+        if (state.draggingFrame.uuid != null) {
+            state.draggingPlaceholders[state.draggingFrame.uuid] = {
+                uuid: state.draggingFrame.uuid,
+                rowUuid: timeline.state.pointer.over.rowUuid ?? state.draggingFrame.data?.rowUuid ?? null,
+                start_ms,
+                end_ms,
+                left,
+                width: state.draggingFrame.data!.width,
+                top,
+            };
+        }
     }
     
     const editorPointerEvents = {
@@ -258,8 +283,16 @@ export const useDnd = ({
         ) : null
     })
 
+    const draggingFrame = (uuid: string | number) =>
+        timeline.state.sectionFramesByUuid[uuid] ?? null;
+
+    const dragging = (uuid: string | number): boolean =>
+        state.dragging && state.draggingPlaceholders[uuid] != null;
+
     return {
         state,
+        draggingFrame,
+        dragging,
         onDragStart: draggingEvents.onDragStart,
         onDragEnd: draggingEvents.onDragEnd,
         onDragCancel: draggingEvents.onDragCancel,
@@ -285,12 +318,18 @@ export interface DndStateInterface {
         pointerX: number,
         pointerY: number,
     },
-    draggingPlaceholder: {
-        left: number,
-        top: number,
-        start_ms: number,
-        end_ms: number,
-        // Settable by external features. When true, dnd locks the ghost to the original row.
-        row_locked: boolean,
-    }
+    // When true, vertical position is locked to the original row.
+    rowLocked: boolean,
+    // Map of active ghost placeholders keyed by frame uuid.
+    draggingPlaceholders: Record<string | number, DraggingPlaceholderInterface>,
+}
+
+export interface DraggingPlaceholderInterface {
+    uuid: string | number,
+    rowUuid: string | number | null,
+    start_ms: number,
+    end_ms: number,
+    left: number,
+    width: number,
+    top: number,
 }

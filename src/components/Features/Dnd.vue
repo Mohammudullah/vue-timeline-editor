@@ -3,7 +3,7 @@ import { computed, inject, onUnmounted, Teleport } from 'vue';
 import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
-import { useDnd, UseDndType } from '../../composables/features/dnd';
+import { useDnd, UseDndType, DraggingPlaceholderInterface } from '../../composables/features/dnd';
 import FrameUI from '../Timeline/UI/FrameUI.vue';
 import { TimelineFrameByUuidInterface } from '../../types/timeline';
 import { DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
@@ -34,10 +34,32 @@ if(!timeline || !timelineConfig || !features) {
     features.initFeature('dnd', () => useDnd({ timeline, timelineConfig, frame: features.data.frame, edgeSnap: props.edgeSnap }));
 }
 
-const frame = computed(() => features?.data.dnd?.state.draggingFrame.data);
-
 const dnd = computed<UseDndType | null>(() => features?.data.dnd ?? null);
 const activeHandler = computed(() => features?.data.snapping || features?.data.dnd || null);
+
+// Sorted ghost entries by vertical position — used to determine which ghost
+// entries are adjacent to a linked sibling so the connected edge style applies.
+const sortedGhostEntries = computed(() => {
+    return Object.values(dnd.value?.state.draggingPlaceholders ?? {}).sort((a, b) => a.top - b.top);
+});
+
+// Returns { linkedAbove, linkedBelow } flags for a given ghost placeholder
+// entry. Two entries are considered adjacent when they are vertically one
+// row-height apart and share the same linkGroupUuid.
+const getGhostLinkFlags = (entry: DraggingPlaceholderInterface) => {
+    const rowHeight = timelineConfig?.rows.height ?? 0;
+    const myGroup = dnd.value?.draggingFrame(entry.uuid)?.linkGroupUuid;
+    if (!myGroup) return { linkedAbove: false, linkedBelow: false };
+    const sorted = sortedGhostEntries.value;
+    const idx = sorted.findIndex(e => e.uuid === entry.uuid);
+    const linkedAbove = idx > 0
+        && Math.abs(sorted[idx - 1].top - entry.top) <= rowHeight
+        && dnd.value?.draggingFrame(sorted[idx - 1].uuid)?.linkGroupUuid === myGroup;
+    const linkedBelow = idx >= 0 && idx < sorted.length - 1
+        && Math.abs(sorted[idx + 1].top - entry.top) <= rowHeight
+        && dnd.value?.draggingFrame(sorted[idx + 1].uuid)?.linkGroupUuid === myGroup;
+    return { linkedAbove: !!linkedAbove, linkedBelow: !!linkedBelow };
+};
 
 
 const handleOnDragStart = (frame: TimelineFrameByUuidInterface, event: PointerEvent) => {
@@ -55,14 +77,21 @@ const handleOnDragCancel = (frame: TimelineFrameByUuidInterface, frameData: Drag
 const handleOnDrop = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
     emits('drop', frame, frameData, event);
 
-    //update frame position on drop
-    timeline?.updateFrame(frame.uuid, {
-        start_ms: frameData.current.start_ms,
-        end_ms: frameData.current.end_ms,
-        uuid: frame.uuid,
-        title: frame.title,
-        rowUuid: frameData.current.rowUuid ?? frame.rowUuid,
-        sectionUuid: frameData.current.sectionUuid ?? frame.sectionUuid,
+    // frameData.current is an array — one entry per frame in the group (or just
+    // the primary for a non-grouped drag). Update every frame so group members
+    // are persisted alongside the primary.
+    frameData.current.forEach(item => {
+        const original = timeline?.state.sectionFramesByUuid[item.uuid];
+        if (!original) return;
+        timeline?.updateFrame(item.uuid, {
+            uuid: item.uuid,
+            title: original.title,
+            start_ms: item.start_ms,
+            end_ms: item.end_ms,
+            rowUuid: item.rowUuid ?? original.rowUuid,
+            sectionUuid: item.sectionUuid ?? original.sectionUuid,
+            linkGroupUuid: original.linkGroupUuid, // preserve link group on drag
+        });
     });
 };
 
@@ -78,7 +107,7 @@ watch(activeHandler, (newHandler, oldHandler) => {
     newHandler?.onDragEnd(handleOnDragEnd, 'activeHandlerOnDragEnd');
     newHandler?.onDragCancel(handleOnDragCancel, 'activeHandlerOnDragCancel');
     newHandler?.onDrop(handleOnDrop, 'activeHandlerOnDrop');
-})
+}, { immediate: true })
 
 onUnmounted(() => {
     features?.destroyFeature('dnd');
@@ -89,72 +118,72 @@ onUnmounted(() => {
 <template>
 
     <!--
-        Freeform ghost preview.
-        Follows the raw pointer position via dnd.state.draggingPlaceholder; no
-        snapping is applied here so the user feels full control while dragging.
+        Ghost previews.
+        Loop over draggingPlaceholders — always contains the primary frame while
+        dragging; external features (e.g. JoinRows) add group-member entries.
     -->
     <Teleport to="#editorAreaTeleports" defer>
         <div
+            v-for="entry in Object.values(dnd?.state.draggingPlaceholders ?? {})"
+            :key="'freeform-' + entry.uuid"
+            class="vtd__dragging-placeholder"
             :style="{
-                transform: `translateY(${dnd.state.draggingPlaceholder.top}px)`,
-                height: dnd.state.container.height + 'px',
+                transform: `translate(${entry.left}px, ${entry.top}px)`,
+                height: timelineConfig?.rows.height + 'px',
                 top: 0,
                 left: 0,
                 position: 'absolute',
-                zIndex: 1
+                zIndex: 1,
+                pointerEvents: 'none',
             }"
-            v-if="frame && dnd"
-            class="vtd__dragging-placeholder"
-
         >
-            <div
-                :style="{
-                    transform: `translateX(${dnd.state.draggingPlaceholder.left}px)`,
-                    height: '100%',
-                }"
-            >
-                <FrameUI
-                    :start-ms="dnd.state.draggingPlaceholder.start_ms ?? frame.start_ms"
-                    :end-ms="dnd.state.draggingPlaceholder.end_ms ?? frame.end_ms"
-                    :title="frame.title"
-                    :left="0"
-                    :width="dnd.state.container.width"
-                    :selected="true"
-                />
-            </div>
+            <FrameUI
+                :start-ms="entry.start_ms"
+                :end-ms="entry.end_ms"
+                :title="dnd?.draggingFrame(entry.uuid)?.title ?? null"
+                :left="0"
+                :width="entry.width"
+                :selected="true"
+                :linked-above="getGhostLinkFlags(entry).linkedAbove"
+                :linked-below="getGhostLinkFlags(entry).linkedBelow"
+            />
         </div>
 
         <!--
-            Drop-target highlighter.
-            Visualizes where the dragged frame will land (suggestion area).
-            Exposed as a named slot so consumers can fully replace it.
-            For now positioned from activeHandler.state.draggingPlaceholder; will be
-            rewired to a dedicated suggestion state in a later step.
+            Drop-target highlighters.
+            Validated snapped positions from activeHandler (snapping when active,
+            dnd otherwise). Primary entry gets the user-replaceable highlighter slot.
         -->
         <div
-            v-if="frame && dnd && activeHandler"
+            v-for="entry in Object.values(activeHandler?.state.draggingPlaceholders ?? {})"
+            :key="'highlight-' + entry.uuid"
             class="vtd__drag-highlighter"
             :style="{
-                transform: `translate(${activeHandler.state.draggingPlaceholder.left}px, ${activeHandler.state.draggingPlaceholder.top}px)`,
-                width: dnd.state.container.width + 'px',
-                height: dnd.state.container.height + 'px',
+                transform: `translate(${entry.left}px, ${entry.top}px)`,
+                width: entry.width + 'px',
+                height: timelineConfig?.rows.height + 'px',
                 top: 0,
                 left: 0,
                 position: 'absolute',
                 pointerEvents: 'none',
             }"
         >
-            <slot
-                name="highlighter"
-                :top="activeHandler.state.draggingPlaceholder.top"
-                :left="activeHandler.state.draggingPlaceholder.left"
-                :width="dnd.state.container.width"
-                :height="dnd.state.container.height"
-                :start-ms="activeHandler.state.draggingPlaceholder.start_ms"
-                :end-ms="activeHandler.state.draggingPlaceholder.end_ms"
-            >
+            <template v-if="entry.uuid === dnd?.state.draggingFrame.uuid">
+                <slot
+                    name="highlighter"
+                    :top="entry.top"
+                    :left="entry.left"
+                    :width="entry.width"
+                    :height="timelineConfig?.rows.height ?? 0"
+                    :start-ms="entry.start_ms"
+                    :end-ms="entry.end_ms"
+                >
+                    <div class="vtd__drag-highlighter__default" />
+                </slot>
+            </template>
+            <template v-else>
                 <div class="vtd__drag-highlighter__default" />
-            </slot>
+            </template>
         </div>
     </Teleport>
 

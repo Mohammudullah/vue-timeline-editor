@@ -191,8 +191,59 @@
     opacity: 0.9;
 }
 
-/**------------ Row Styles End ---------------**/ 
+/* ---- Linked-group resize handle repositioning -------------------------
+   Goal: show ONE grip visually centered across the joined rows.
 
+   Top frame(s) of group (linkedBelow, not linkedAbove): hide their handles.
+   The bottom frame's handle (repositioned upward) will cover this area.
+
+   Middle frames (both flags): hide handles entirely.
+
+   Bottom frame of group (linkedAbove, not linkedBelow): reposition so the
+   grip sits AT the row boundary (top of this frame = bottom of frame above).
+   For a 2-frame group this is the vertical center of the whole group.
+------------------------------------------------------------------------ */
+.vtd__row-frame-resize-handle--linked-below {
+    /* top frame (or any frame that has a linked sibling below) */
+    pointer-events: none;
+}
+.vtd__row-frame-resize-handle--linked-below .vtd__row-frame-resize-handle-grip {
+    opacity: 0;
+}
+
+/* Bottom frame of group: move the handle up so the grip is at the boundary */
+.vtd__row-frame-resize-handle--linked-above:not(.vtd__row-frame-resize-handle--linked-below) {
+    top: 0;
+    transform: translateY(-50%);
+    height: 200%; /* larger hit area spanning into the row above */
+    pointer-events: auto;
+}
+
+
+
+.vtd__row-frame--linked-above {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-top-width: 1px;
+    border-top-style: dashed;
+    border-top-color: rgba(238, 238, 238, 0.8);
+}
+
+.vtd__row-frame--linked-below {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom-width: 1px;
+    border-bottom-style: dashed;
+    border-bottom-color: rgba(238, 238, 238, 0.8);
+}
+
+.vtd__row-frame-selected.vtd__row-frame--linked-above {
+    border-top-color: rgba(238, 238, 238, 0.8);
+}
+
+.vtd__row-frame-selected.vtd__row-frame--linked-below {
+    border-bottom-color: rgba(0, 120, 215, 0.35);
+}
 
 .vtd__drag-highlighter {
     transition: transform 100ms cubic-bezier(0.2, 0, 0, 1);

@@ -2,9 +2,9 @@ import { computed, reactive, Ref, watch } from "vue";
 import { UseTimelineInterface } from "../timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
 import { UseFeaturesType } from "./features";
-import { UseDndType } from "./dnd";
+import { DraggingPlaceholderInterface, UseDndType } from "./dnd";
 import { TimelineFrameByUuidInterface } from "../../types/timeline";
-import { DraggedFrameDataInterface, ResizedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
+import { DraggedFrameDataInterface, FrameDataItem, ResizedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
 import { UseResizeInterface } from "./resize";
 import useUtils from "../utils";
 
@@ -40,19 +40,10 @@ export const useSnapping = ({
     } 
 
     const state = reactive<SnappingStateInterface>({
-        draggingPlaceholder: {
-            left: 0, 
-            top: 0,
-            start_ms: 0,
-            end_ms: 0,
-        },
-        resizingPlaceholder: {
-            left: 0,
-            top: 0,
-            start_ms: 0,
-            end_ms: 0,
-            width: 0
-        },
+        // Validated snapped positions for all active drag ghosts, keyed by frame uuid.
+        draggingPlaceholders: {},
+        // Validated snapped positions for all active resize ghosts, keyed by frame uuid.
+        resizingPlaceholders: {},
         // Active snap guide markers populated each pipeline run; consumers (e.g.
         // <SnapGuideLines/>) render highlighted lines while dragging.
         dragSnapGuides: [],
@@ -132,41 +123,71 @@ export const useSnapping = ({
 
     const getDraggingFrameData = () : DraggedFrameDataInterface => {
 
-        const currentRow = setFrameOverRow(state.draggingPlaceholder.top);
+        const primaryUuid = dnd.value?.state.draggingFrame.uuid;
+        const primaryPlaceholder = primaryUuid != null ? state.draggingPlaceholders[primaryUuid] : null;
+        const currentRow = setFrameOverRow(primaryPlaceholder?.top ?? 0);
 
-        return {
-            initial: {
-                sectionUuid: dnd.value?.state.draggingFrame.data?.sectionUuid ?? null,
-                rowUuid: dnd.value?.state.draggingFrame.data?.rowUuid ?? null,
-                start_ms: dnd.value?.state.draggingFrame.data?.start_ms ?? 0,
-                end_ms: dnd.value?.state.draggingFrame.data?.end_ms ?? 0,
-            },
-            current: {
-                sectionUuid: currentRow.sectionUuid,
-                rowUuid: currentRow.rowUuid,
-                start_ms: state.draggingPlaceholder.start_ms,
-                end_ms: state.draggingPlaceholder.end_ms,
-            }
-        }
+        const initial: FrameDataItem[] = [];
+        const current: FrameDataItem[] = [];
+
+        // Always put the primary first, then the rest.
+        const entries = Object.values(state.draggingPlaceholders).sort((a, b) =>
+            a.uuid === primaryUuid ? -1 : b.uuid === primaryUuid ? 1 : 0
+        );
+
+        entries.forEach(entry => {
+            const originalFrame = timeline.state.sectionFramesByUuid[entry.uuid];
+            initial.push({
+                uuid: entry.uuid,
+                sectionUuid: originalFrame?.sectionUuid ?? null,
+                rowUuid: originalFrame?.rowUuid ?? null,
+                start_ms: originalFrame?.start_ms ?? 0,
+                end_ms: originalFrame?.end_ms ?? 0,
+            });
+            const isPrimary = entry.uuid === primaryUuid;
+            current.push({
+                uuid: entry.uuid,
+                sectionUuid: isPrimary ? currentRow.sectionUuid : (originalFrame?.sectionUuid ?? null),
+                rowUuid: isPrimary ? currentRow.rowUuid : entry.rowUuid,
+                start_ms: entry.start_ms,
+                end_ms: entry.end_ms,
+            });
+        });
+
+        return { initial, current };
     }
     
     
     const getResizingFrameData = () : ResizedFrameDataInterface => {
 
-        return {
-            initial: {
-                sectionUuid: resize.value?.state.resizingFrame.frame?.sectionUuid ?? null,
-                rowUuid: resize.value?.state.resizingFrame.frame?.rowUuid ?? null,
-                start_ms: resize.value?.state.resizingFrame.frame?.start_ms ?? 0,
-                end_ms: resize.value?.state.resizingFrame.frame?.end_ms ?? 0,
-            },
-            current: {
-                sectionUuid: resize.value?.state.resizingFrame.frame?.sectionUuid ?? null,
-                rowUuid: resize.value?.state.resizingFrame.frame?.rowUuid ?? null,
-                start_ms: state.resizingPlaceholder.start_ms,
-                end_ms: state.resizingPlaceholder.end_ms,
-            }
-        }
+        const primaryUuid = resize.value?.state.resizingFrame.uuid;
+
+        const initial: FrameDataItem[] = [];
+        const current: FrameDataItem[] = [];
+
+        const entries = Object.values(state.resizingPlaceholders).sort((a, b) =>
+            a.uuid === primaryUuid ? -1 : b.uuid === primaryUuid ? 1 : 0
+        );
+
+        entries.forEach(entry => {
+            const originalFrame = timeline.state.sectionFramesByUuid[entry.uuid];
+            initial.push({
+                uuid: entry.uuid,
+                sectionUuid: originalFrame?.sectionUuid ?? null,
+                rowUuid: originalFrame?.rowUuid ?? null,
+                start_ms: originalFrame?.start_ms ?? 0,
+                end_ms: originalFrame?.end_ms ?? 0,
+            });
+            current.push({
+                uuid: entry.uuid,
+                sectionUuid: originalFrame?.sectionUuid ?? null,
+                rowUuid: originalFrame?.rowUuid ?? null,
+                start_ms: entry.start_ms,
+                end_ms: entry.end_ms,
+            });
+        });
+
+        return { initial, current };
     }
 
 
@@ -288,6 +309,35 @@ export const useSnapping = ({
         endMs: null as number | null,
     }
 
+    // Tracks the last position where the WHOLE group (primary + every member row)
+    // was unblocked. Advanced only after the post-pipeline group overlap check
+    // passes. Used to revert atomically when any member would overlap.
+    let lastGroupSafeDragPosition = {
+        top: null as number | null,
+        left: null as number | null,
+        startMs: null as number | null,
+        endMs: null as number | null,
+    }
+
+    let lastGroupSafeResizePosition = {
+        top: null as number | null,
+        left: null as number | null,
+        startMs: null as number | null,
+        endMs: null as number | null,
+    }
+
+    // Returns frames sharing `primaryUuid`'s linkGroupUuid (excluding the primary
+    // itself). Reads directly from timeline state — independent of any feature's
+    // reactive update timing, so it's safe to use from tick 1.
+    const getLinkedSiblings = (primaryUuid: string | number) => {
+        const primary = timeline.state.sectionFramesByUuid[primaryUuid];
+        if (!primary || primary.linkGroupUuid == null) return [];
+        const linkUuid = primary.linkGroupUuid;
+        return Object.values(timeline.state.sectionFramesByUuid).filter(
+            f => f.linkGroupUuid === linkUuid && f.uuid !== primaryUuid
+        );
+    };
+
     const protectOverLappingFrames = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
         
         // if pointer or frame any of them are over a frame, then return last position which is not overlapping, 
@@ -331,11 +381,16 @@ export const useSnapping = ({
                 break;
             }
 
-            // then check if dragging frame is over an existing area (strict inequalities so adjacent/touching frames are not considered overlapping)
+            // then check if dragging frame is over an existing area.
+            // Canonical interval-overlap test: touching is allowed
+            // (start_ms == existingEnd or end_ms == existingStart returns false),
+            // but every true overlap is caught — including exact coincidence
+            // and boundary-aligned containment which the previous three-condition
+            // form missed when other snap pipelines aligned the frame's edges
+            // with an obstacle's edges.
             if(
-                (dependency.frame.start_ms > existingFrameStart && dependency.frame.start_ms < existingFrameEnd) 
-                || (dependency.frame.end_ms > existingFrameStart && dependency.frame.end_ms < existingFrameEnd) 
-                || (dependency.frame.start_ms < existingFrameStart && dependency.frame.end_ms > existingFrameEnd)
+                dependency.frame.start_ms < existingFrameEnd
+                && dependency.frame.end_ms > existingFrameStart
             ) {
                 frameOverLapping = true;
                 overlappingFrameStart = existingFrameStart;
@@ -638,6 +693,25 @@ export const useSnapping = ({
     }
 
 
+    // Returns true if [start_ms, end_ms] would overlap any frame in rowUuid
+    // (excluding the dragging/resizing frame itself).
+    const wouldOverlapInRow = (rowUuid: string | number, start_ms: number, end_ms: number, excludeUuid: string | number): boolean => {
+        const rowFrames = Object.values(timeline.state.sectionFramesByUuid)
+            .filter(f => f.rowUuid === rowUuid && f.uuid !== excludeUuid);
+        for (const f of rowFrames) {
+            // Canonical interval-overlap test: touching is allowed (start == otherEnd
+            // or end == otherStart returns false), but every true overlap is caught
+            // — including exact coincidence ([2h,4h] vs [2h,4h]) and boundary-aligned
+            // containment ([2h,5h] vs [2h,4h]) which the previous three-condition
+            // form missed when snap functions aligned a sibling's edges with the
+            // obstacle's edges.
+            if (start_ms < f.end_ms && end_ms > f.start_ms) {
+                return true;
+            }
+        }
+        return false;
+    };
+
     const dragSnapPipeline = [
         snapRows,
         snapFrames,
@@ -673,25 +747,110 @@ export const useSnapping = ({
             endMs: null as number | null,
         }
 
+        const primaryUuid = dnd.value.state.draggingFrame.uuid;
+        if (primaryUuid == null) return;
+        const freeformPrimary = dnd.value.state.draggingPlaceholders[primaryUuid];
+        if (!freeformPrimary) return;
+
         const dependency = {
             frame: {
-                start_ms: dnd.value.state.draggingPlaceholder.start_ms,
-                end_ms: dnd.value.state.draggingPlaceholder.end_ms,
-                left: dnd.value.state.draggingPlaceholder.left,
+                start_ms: freeformPrimary.start_ms,
+                end_ms: freeformPrimary.end_ms,
+                left: freeformPrimary.left,
             },
             event: 'drag',
         } as SnapDependencyInterface;
+
+        // When rowLocked (JoinRows), override the row to the original row so the
+        // highlighter stays pinned — same logic as dnd.ts setPlaceholderPosition.
+        const rowLocked = dnd.value.state.rowLocked;
+        const lockedRowUuid = rowLocked ? dnd.value.state.draggingFrame.data?.rowUuid ?? null : null;
+        const effectiveRowUuid = lockedRowUuid ?? timeline.state.pointer.over.rowUuid ?? null;
+        if (rowLocked && lockedRowUuid && lockedRowUuid !== activeRowCache.rowUuid) {
+            cacheActiveRow(lockedRowUuid);
+        }
+
+        // Snapshot kept for reference — not used now that we have lastGroupSafeDragPosition.
+        // const safePositionSnapshot = { ...lastNotOverflowedPosition };
 
         dragSnapPipeline.forEach((snapFunction) => {
             snapPosition = snapFunction(dependency, snapPosition.top, snapPosition.left, snapPosition.startMs, snapPosition.endMs) as { top: number | null; left: number | null; startMs: number | null; endMs: number | null };
 
         });
 
+        // Enforce row lock on the top position after pipeline.
+        if (rowLocked && lockedRowUuid) {
+            const lockedRow = timeline.state.sectionRowsByUuid[lockedRowUuid];
+            if (lockedRow) snapPosition.top = lockedRow.editorRelativeTop;
+        }
 
-        state.draggingPlaceholder.top = snapPosition.top == null ? dnd?.value?.state.draggingPlaceholder.top ?? 0 : snapPosition.top;
-        state.draggingPlaceholder.left = snapPosition.left == null ? dnd.value?.state.draggingPlaceholder.left ?? 0 : snapPosition.left;
-        state.draggingPlaceholder.start_ms = snapPosition.startMs == null ? dnd.value?.state.draggingPlaceholder.start_ms ?? 0 : snapPosition.startMs;
-        state.draggingPlaceholder.end_ms = snapPosition.endMs == null ? dnd.value?.state.draggingPlaceholder.end_ms ?? 0 : snapPosition.endMs;
+        state.draggingPlaceholders[primaryUuid] = {
+            uuid: primaryUuid,
+            rowUuid: effectiveRowUuid,
+            top: snapPosition.top ?? freeformPrimary.top,
+            left: snapPosition.left ?? freeformPrimary.left,
+            start_ms: snapPosition.startMs ?? freeformPrimary.start_ms,
+            end_ms: snapPosition.endMs ?? freeformPrimary.end_ms,
+            width: freeformPrimary.width,
+        };
+
+        // If any LINKED SIBLING would overlap in their own row at the validated
+        // primary times, revert primary to the last position the group was fully
+        // safe at. Sibling list comes from timeline state directly to avoid any
+        // dependency on joinRows watchEffect timing.
+        let validatedPrimary = state.draggingPlaceholders[primaryUuid];
+        const linkedSiblings = getLinkedSiblings(primaryUuid);
+        let anyMemberBlocked = false;
+
+        for (const sibling of linkedSiblings) {
+            if (wouldOverlapInRow(sibling.rowUuid, validatedPrimary.start_ms, validatedPrimary.end_ms, sibling.uuid)) {
+                anyMemberBlocked = true;
+                break;
+            }
+        }
+
+        if (anyMemberBlocked) {
+            const safeLeft = lastGroupSafeDragPosition.left;
+            const safeStart = lastGroupSafeDragPosition.startMs;
+            const safeEnd = lastGroupSafeDragPosition.endMs;
+            state.draggingPlaceholders[primaryUuid] = {
+                uuid: primaryUuid,
+                rowUuid: validatedPrimary.rowUuid,
+                top: validatedPrimary.top,
+                left: safeLeft ?? validatedPrimary.left,
+                start_ms: safeStart ?? validatedPrimary.start_ms,
+                end_ms: safeEnd ?? validatedPrimary.end_ms,
+                width: freeformPrimary.width,
+            };
+            // Roll back protectOverLappingFrames' tracker too so it doesn't keep
+            // approving member-blocking positions on subsequent ticks.
+            lastNotOverflowedPosition = { ...lastGroupSafeDragPosition };
+            validatedPrimary = state.draggingPlaceholders[primaryUuid];
+        } else if (linkedSiblings.length > 0) {
+            // Group fully safe — advance the group tracker.
+            lastGroupSafeDragPosition = {
+                top: validatedPrimary.top,
+                left: validatedPrimary.left,
+                startMs: validatedPrimary.start_ms,
+                endMs: validatedPrimary.end_ms,
+            };
+        }
+
+        // Mirror validated primary times to all linked siblings. Use getLinkedSiblings
+        // (reads directly from timeline state) instead of dnd.state.draggingPlaceholders
+        // so members are present on tick 1 before joinRows watchEffect fires.
+        linkedSiblings.forEach(sibling => {
+            const memberRow = timeline.state.sectionRowsByUuid[sibling.rowUuid];
+            state.draggingPlaceholders[sibling.uuid] = {
+                uuid: sibling.uuid,
+                rowUuid: sibling.rowUuid,
+                top: memberRow?.editorRelativeTop ?? 0,
+                left: (validatedPrimary.start_ms * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                start_ms: validatedPrimary.start_ms,
+                end_ms: validatedPrimary.end_ms,
+                width: sibling.width,
+            };
+        });
     }
 
 
@@ -719,15 +878,83 @@ export const useSnapping = ({
             interactionDirection: resize.value.state.resizingFrame.side,
         } as SnapDependencyInterface;
 
+        // Snapshot kept for reference — not used now that we have lastGroupSafeResizePosition.
+        // const safeResizeSnapshot = { ...lastNotOverflowedPosition };
+
         resizeSnapPipeline.forEach((snapFunction) => {
             snapPosition = snapFunction(dependency, snapPosition.top, snapPosition.left, snapPosition.startMs, snapPosition.endMs) as { top: number | null; left: number | null; startMs: number | null; endMs: number | null };
         });
 
-        state.resizingPlaceholder.top = snapPosition.top == null ? resize?.value?.state.resizingPlaceholder.top ?? 0 : snapPosition.top;
-        state.resizingPlaceholder.left = snapPosition.left == null ? resize.value?.state.resizingPlaceholder.left ?? 0 : snapPosition.left;
-        state.resizingPlaceholder.start_ms = snapPosition.startMs == null ? resize.value?.state.resizingPlaceholder.start_ms ?? 0 : snapPosition.startMs;
-        state.resizingPlaceholder.end_ms = snapPosition.endMs == null ? resize.value?.state.resizingPlaceholder.end_ms ?? 0 : snapPosition.endMs;
-        state.resizingPlaceholder.width = calculateFrameWidth(state.resizingPlaceholder.start_ms, state.resizingPlaceholder.end_ms, timelineConfig.cols.pixelPerMs);
+        const primaryUuid = resize.value.state.resizingFrame.uuid;
+        if (primaryUuid == null) return;
+
+        const start_ms = snapPosition.startMs ?? resize.value.state.resizingPlaceholder.start_ms ?? 0;
+        const end_ms = snapPosition.endMs ?? resize.value.state.resizingPlaceholder.end_ms ?? 0;
+
+        state.resizingPlaceholders[primaryUuid] = {
+            uuid: primaryUuid,
+            rowUuid: resize.value.state.resizingFrame.frame?.rowUuid ?? null,
+            top: snapPosition.top ?? resize.value.state.resizingPlaceholder.top ?? 0,
+            left: snapPosition.left ?? resize.value.state.resizingPlaceholder.left ?? 0,
+            start_ms,
+            end_ms,
+            width: calculateFrameWidth(start_ms, end_ms, timelineConfig.cols.pixelPerMs),
+        };
+
+        // If any LINKED SIBLING would overlap at the validated primary times,
+        // revert to the last known safe group position. Sibling list comes from
+        // timeline state directly (no joinRows timing dependency).
+        let validatedResizePrimary = state.resizingPlaceholders[primaryUuid];
+        const linkedResizeSiblings = getLinkedSiblings(primaryUuid);
+        let anyResizeMemberBlocked = false;
+
+        for (const sibling of linkedResizeSiblings) {
+            if (wouldOverlapInRow(sibling.rowUuid, validatedResizePrimary.start_ms, validatedResizePrimary.end_ms, sibling.uuid)) {
+                anyResizeMemberBlocked = true;
+                break;
+            }
+        }
+
+        if (anyResizeMemberBlocked) {
+            const safeStart = lastGroupSafeResizePosition.startMs ?? start_ms;
+            const safeEnd = lastGroupSafeResizePosition.endMs ?? end_ms;
+            state.resizingPlaceholders[primaryUuid] = {
+                uuid: primaryUuid,
+                rowUuid: validatedResizePrimary.rowUuid,
+                top: validatedResizePrimary.top,
+                left: lastGroupSafeResizePosition.left ?? validatedResizePrimary.left,
+                start_ms: safeStart,
+                end_ms: safeEnd,
+                width: calculateFrameWidth(safeStart, safeEnd, timelineConfig.cols.pixelPerMs),
+            };
+            lastNotOverflowedPosition = { ...lastGroupSafeResizePosition };
+            validatedResizePrimary = state.resizingPlaceholders[primaryUuid];
+        } else if (linkedResizeSiblings.length > 0) {
+            lastGroupSafeResizePosition = {
+                top: validatedResizePrimary.top,
+                left: validatedResizePrimary.left,
+                startMs: validatedResizePrimary.start_ms,
+                endMs: validatedResizePrimary.end_ms,
+            };
+        }
+
+        // Mirror validated primary times to all linked siblings. Use getLinkedSiblings
+        // (reads directly from timeline state) instead of resize.state.resizingPlaceholders
+        // so members are always present on tick 1, before joinRows watchEffect fires.
+        linkedResizeSiblings.forEach(sibling => {
+            const memberRow = timeline.state.sectionRowsByUuid[sibling.rowUuid];
+            const mStart = validatedResizePrimary.start_ms;
+            const mEnd = validatedResizePrimary.end_ms;
+            state.resizingPlaceholders[sibling.uuid] = {
+                uuid: sibling.uuid,
+                rowUuid: sibling.rowUuid,
+                top: memberRow?.editorRelativeTop ?? 0,
+                left: validatedResizePrimary.left,
+                start_ms: mStart,
+                end_ms: mEnd,
+                width: calculateFrameWidth(mStart, mEnd, timelineConfig.cols.pixelPerMs),
+            };
+        });
     }
 
     watch([() => timeline.state.pointer.clientX, () => timeline.state.pointer.clientY, () => dnd.value?.state.dragging], snapOnDragPipeline, { deep: true });
@@ -735,26 +962,51 @@ export const useSnapping = ({
 
     watch(() => dnd.value?.state.dragging, (dragging) => {
         if(!dragging) {
-            lastNotOverflowedPosition = {
-                top: null,
-                left: null,
-                startMs: null,
-                endMs: null,
-            }
+            lastNotOverflowedPosition = { top: null, left: null, startMs: null, endMs: null }
+            lastGroupSafeDragPosition = { top: null, left: null, startMs: null, endMs: null }
             state.dragSnapGuides = [];
+            state.draggingPlaceholders = {};
+            // Invalidate the cached row so the next drag rebuilds it from fresh
+            // timeline state. Without this, dragging frame B right after dragging
+            // frame A onto the same row would see A's pre-drag position.
+            activeRowCache.rowUuid = null;
         }
         else {
             calculateRowsCenterCache();
+            // Seed group safe tracker with the frame's original (pre-drag) position
+            // so an early member-row overlap can be detected on tick 1 with a real
+            // fallback. Without this, the first member-blocking tick would revert
+            // to nulls and `lastNotOverflowedPosition` would be wiped.
+            const fd = dnd.value?.state.draggingFrame.data;
+            if (fd) {
+                lastGroupSafeDragPosition = {
+                    top: null,
+                    left: fd.editorRelativeLeft,
+                    startMs: fd.start_ms,
+                    endMs: fd.end_ms,
+                };
+                lastNotOverflowedPosition = { ...lastGroupSafeDragPosition };
+            }
         }
     });
 
     watch(() => resize.value?.state.resizing, (resizing) => {
         if(!resizing) {
-            lastNotOverflowedPosition = {
-                top: null,
-                left: null,
-                startMs: null,
-                endMs: null,
+            lastNotOverflowedPosition = { top: null, left: null, startMs: null, endMs: null }
+            lastGroupSafeResizePosition = { top: null, left: null, startMs: null, endMs: null }
+            state.resizingPlaceholders = {};
+            // Invalidate the cached row so the next resize/drag rebuilds it.
+            activeRowCache.rowUuid = null;
+        } else {
+            const fd = resize.value?.state.resizingFrame.frame;
+            if (fd) {
+                lastGroupSafeResizePosition = {
+                    top: null,
+                    left: fd.editorRelativeLeft,
+                    startMs: fd.start_ms,
+                    endMs: fd.end_ms,
+                };
+                lastNotOverflowedPosition = { ...lastGroupSafeResizePosition };
             }
         }
     });
@@ -806,19 +1058,10 @@ export const useSnapping = ({
 export type UseSnappingInterface = ReturnType<typeof useSnapping>;
 
 export interface SnappingStateInterface {
-    draggingPlaceholder: {
-        left: number,
-        top: number,
-        start_ms: number,
-        end_ms: number,
-    },
-    resizingPlaceholder: {
-        left: number,
-        top: number,
-        start_ms: number,
-        end_ms: number,
-        width: number,
-    },
+    // Validated snapped positions for all active drag ghosts, keyed by frame uuid.
+    draggingPlaceholders: Record<string | number, DraggingPlaceholderInterface>,
+    // Validated snapped positions for all active resize ghosts, keyed by frame uuid.
+    resizingPlaceholders: Record<string | number, DraggingPlaceholderInterface>,
     dragSnapGuides: { ms: number, left: number, source: 'grid-major' | 'grid-minor' | 'frame-edge' }[],
 }
 

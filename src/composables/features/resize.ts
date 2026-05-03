@@ -3,8 +3,9 @@ import { UseTimelineInterface } from "../timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
 import { UseFrameInterface } from "./frame";
 import { TimelineFrameByUuidInterface } from "../../types/timeline";
-import { ResizedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
+import { FrameDataItem, ResizedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
 import useUtils from "../utils";
+import { DraggingPlaceholderInterface } from "./dnd";
 
 export const useResize = ({
     timeline,
@@ -40,7 +41,9 @@ export const useResize = ({
             left: 0,
             width: 0,
             top: 0,
-        }
+        },
+        // Map of active resize ghost placeholders keyed by frame uuid.
+        resizingPlaceholders: {},
     });
 
 
@@ -93,20 +96,44 @@ export const useResize = ({
 
 
     const generateResizedFrameData = () : ResizedFrameDataInterface => {
-        return {
-            initial: {
-                sectionUuid: state.resizingFrame.frame?.sectionUuid ?? null,
-                rowUuid: state.resizingFrame.frame?.rowUuid ?? null,
-                start_ms: state.resizingFrame.frame?.start_ms ?? 0,
-                end_ms: state.resizingFrame.frame?.end_ms ?? 0,           
-            },
-            current: {
-                sectionUuid: state.resizingFrame.frame?.sectionUuid ?? null,
-                rowUuid: state.resizingFrame.frame?.rowUuid ?? null,
-                start_ms: state.resizingPlaceholder.start_ms,
-                end_ms: state.resizingPlaceholder.end_ms,
-            }
+        const primaryUuid = state.resizingFrame.uuid;
+        const initial: FrameDataItem[] = [];
+        const current: FrameDataItem[] = [];
+
+        // Include the primary; group members are written into resizingPlaceholders
+        // by joinRows' watchEffect so they will appear here too.
+        const entries = Object.values(state.resizingPlaceholders).sort((a, b) =>
+            a.uuid === primaryUuid ? -1 : b.uuid === primaryUuid ? 1 : 0
+        );
+
+        entries.forEach(entry => {
+            const frame = entry.uuid === primaryUuid
+                ? state.resizingFrame.frame
+                : null; // members: use placeholder rowUuid/sectionUuid
+            initial.push({
+                uuid: entry.uuid,
+                sectionUuid: frame?.sectionUuid ?? null,
+                rowUuid: frame?.rowUuid ?? entry.rowUuid,
+                start_ms: frame?.start_ms ?? 0,
+                end_ms: frame?.end_ms ?? 0,
+            });
+            current.push({
+                uuid: entry.uuid,
+                sectionUuid: frame?.sectionUuid ?? null,
+                rowUuid: frame?.rowUuid ?? entry.rowUuid,
+                start_ms: entry.start_ms,
+                end_ms: entry.end_ms,
+            });
+        });
+
+        // Fallback: if resizingPlaceholders is empty (non-snapping mode) use legacy singular placeholder
+        if (entries.length === 0 && state.resizingFrame.frame) {
+            const f = state.resizingFrame.frame;
+            initial.push({ uuid: f.uuid, sectionUuid: f.sectionUuid, rowUuid: f.rowUuid, start_ms: f.start_ms, end_ms: f.end_ms });
+            current.push({ uuid: f.uuid, sectionUuid: f.sectionUuid, rowUuid: f.rowUuid, start_ms: state.resizingPlaceholder.start_ms, end_ms: state.resizingPlaceholder.end_ms });
         }
+
+        return { initial, current };
     }
 
 
@@ -119,6 +146,7 @@ export const useResize = ({
 
         timeline.disableEdgeScrolling();
         state.resizing = false;
+        state.resizingPlaceholders = {};
     }
 
     const cancelResize = (event: PointerEvent) => {
@@ -146,6 +174,18 @@ export const useResize = ({
         state.resizingPlaceholder.left = state.resizingFrame.frame.editorRelativeLeft;
         state.resizingPlaceholder.width = state.resizingFrame.frame.width;
         state.resizingPlaceholder.top = timeline.state.pointer.editorRelativeY - state.container.pointerY;
+
+        if (state.resizingFrame.uuid != null) {
+            state.resizingPlaceholders[state.resizingFrame.uuid] = {
+                uuid: state.resizingFrame.uuid,
+                rowUuid: state.resizingFrame.frame.rowUuid,
+                start_ms: state.resizingPlaceholder.start_ms,
+                end_ms: state.resizingPlaceholder.end_ms,
+                left: state.resizingPlaceholder.left,
+                width: state.resizingPlaceholder.width,
+                top: state.resizingPlaceholder.top,
+            };
+        }
     }
 
     const setPlaceholderSize = () => {
@@ -163,6 +203,17 @@ export const useResize = ({
         state.resizingPlaceholder.left = (state.resizingPlaceholder.start_ms * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
         state.resizingPlaceholder.width = calculateFrameWidth(state.resizingPlaceholder.start_ms, state.resizingPlaceholder.end_ms, timelineConfig.cols.pixelPerMs);
 
+        if (state.resizingFrame.uuid != null) {
+            state.resizingPlaceholders[state.resizingFrame.uuid] = {
+                uuid: state.resizingFrame.uuid,
+                rowUuid: state.resizingFrame.frame?.rowUuid ?? null,
+                start_ms: state.resizingPlaceholder.start_ms,
+                end_ms: state.resizingPlaceholder.end_ms,
+                left: state.resizingPlaceholder.left,
+                width: state.resizingPlaceholder.width,
+                top: state.resizingPlaceholder.top,
+            };
+        }
     }
 
     const editorPointerEvents = {
@@ -204,8 +255,12 @@ export const useResize = ({
         ) : null
     })
 
+    const resizing = (uuid: string | number): boolean =>
+        state.resizing && state.resizingPlaceholders[uuid] != null;
+
     return {
         state,
+        resizing,
         onResizeStart: draggingEvents.onResizeStart,
         onResizeEnd: draggingEvents.onResizeEnd,
         onResizeCancel: draggingEvents.onResizeCancel,
@@ -235,6 +290,7 @@ export interface ResizeInterface {
         width: number,
         top: number,
     },
+    resizingPlaceholders: Record<string | number, DraggingPlaceholderInterface>,
 }
 
 export type UseResizeInterface = ReturnType<typeof useResize>;

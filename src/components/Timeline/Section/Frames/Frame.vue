@@ -33,6 +33,38 @@ const frame = computed<TimelineFrameByUuidInterface>(() => {
 
 const container = computed<HTMLDivElement | null>(() => frameUi.value?.container ?? null);
 
+// Ordered row UUIDs for the section this frame belongs to.
+const rowUuids = computed(() => {
+    const sectionUuid = frame.value?.sectionUuid;
+    return sectionUuid != null ? props.timeline.state.sectionRowUuids[sectionUuid] ?? [] : [];
+});
+
+// True when the immediately adjacent row above contains a frame sharing this
+// frame's linkGroupUuid. Used to flatten the top edge for a connected look.
+const hasLinkedAbove = computed(() => {
+    const f = frame.value;
+    if (!f?.linkGroupUuid) return false;
+    const idx = rowUuids.value.indexOf(f.rowUuid);
+    if (idx <= 0) return false;
+    const aboveRowUuid = rowUuids.value[idx - 1];
+    return Object.values(props.timeline.state.sectionFramesByUuid).some(
+        fr => fr.rowUuid === aboveRowUuid && fr.linkGroupUuid === f.linkGroupUuid
+    );
+});
+
+// True when the immediately adjacent row below contains a frame sharing this
+// frame's linkGroupUuid.
+const hasLinkedBelow = computed(() => {
+    const f = frame.value;
+    if (!f?.linkGroupUuid) return false;
+    const idx = rowUuids.value.indexOf(f.rowUuid);
+    if (idx < 0 || idx >= rowUuids.value.length - 1) return false;
+    const belowRowUuid = rowUuids.value[idx + 1];
+    return Object.values(props.timeline.state.sectionFramesByUuid).some(
+        fr => fr.rowUuid === belowRowUuid && fr.linkGroupUuid === f.linkGroupUuid
+    );
+});
+
 </script>
 
 <template>
@@ -51,6 +83,8 @@ const container = computed<HTMLDivElement | null>(() => frameUi.value?.container
         :selected="props.selected"
         v-if="!dragging && !resizing"
         :show-resize-handle="props.selected && !props.dragging && props.resizable"
+        :linked-above="hasLinkedAbove"
+        :linked-below="hasLinkedBelow"
     >
 
     </FrameUI>

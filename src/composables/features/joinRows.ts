@@ -64,8 +64,78 @@ export const useJoinRows = ({
         const dnd = getDnd();
         if (!dnd) return;
         const uuid = dnd.state.draggingFrame.uuid;
-        dnd.state.draggingPlaceholder.row_locked =
+        dnd.state.rowLocked =
             uuid != null && isLinked(uuid);
+    });
+
+    // Write drag ghost entries for all group members while the primary frame is dragging.
+    // Each member ghost tracks the same time delta as the primary but stays on its own row.
+    watchEffect(() => {
+        const dnd = getDnd();
+        if (!dnd) return;
+        const primaryUuid = dnd.state.draggingFrame.uuid;
+        if (primaryUuid == null) return;
+
+        const primaryEntry = dnd.state.draggingPlaceholders[primaryUuid];
+        if (!primaryEntry) return;
+
+        const primaryFrameData = dnd.state.draggingFrame.data;
+        if (!primaryFrameData) return;
+
+        const delta_ms = primaryEntry.start_ms - primaryFrameData.start_ms;
+
+        getGroupMembers(primaryUuid).forEach(memberUuid => {
+            if (memberUuid === primaryUuid) return;
+
+            const memberFrame = timeline.state.sectionFramesByUuid[memberUuid];
+            if (!memberFrame) return;
+
+            const memberRow = timeline.state.sectionRowsByUuid[memberFrame.rowUuid];
+            const start_ms = memberFrame.start_ms + delta_ms;
+            const end_ms = memberFrame.end_ms + delta_ms;
+            const left = (start_ms * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
+
+            dnd.state.draggingPlaceholders[memberUuid] = {
+                uuid: memberUuid,
+                rowUuid: memberFrame.rowUuid,
+                start_ms,
+                end_ms,
+                left,
+                width: memberFrame.width,
+                top: memberRow?.editorRelativeTop ?? 0,
+            };
+        });
+    });
+
+    // Write resize ghost entries for all group members while the primary frame is resizing.
+    // All members share the same start/end times as the primary; only top differs per row.
+    watchEffect(() => {
+        const resize = getResize();
+        if (!resize) return;
+        const primaryUuid = resize.state.resizingFrame.uuid;
+        if (primaryUuid == null) return;
+
+        const primaryEntry = resize.state.resizingPlaceholders[primaryUuid];
+        if (!primaryEntry) return;
+
+        getGroupMembers(primaryUuid).forEach(memberUuid => {
+            if (memberUuid === primaryUuid) return;
+
+            const memberFrame = timeline.state.sectionFramesByUuid[memberUuid];
+            if (!memberFrame) return;
+
+            const memberRow = timeline.state.sectionRowsByUuid[memberFrame.rowUuid];
+
+            resize.state.resizingPlaceholders[memberUuid] = {
+                uuid: memberUuid,
+                rowUuid: memberFrame.rowUuid,
+                start_ms: primaryEntry.start_ms,
+                end_ms: primaryEntry.end_ms,
+                left: primaryEntry.left,
+                width: primaryEntry.width,
+                top: memberRow?.editorRelativeTop ?? 0,
+            };
+        });
     });
 
     /**
