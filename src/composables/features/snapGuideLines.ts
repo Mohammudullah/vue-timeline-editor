@@ -16,6 +16,9 @@ export const useSnapGuideLines = ({
     const state = reactive<SnapGuideLinesStateInterface>({
         majorGridPositions: [],
         minorGridPositions: [],
+        // One { top, height } segment per section — covers only the row area,
+        // skipping each section's label bar so grid lines stay invisible there.
+        sectionRowAreas: [],
     });
 
     watchEffect(() => {
@@ -24,6 +27,17 @@ export const useSnapGuideLines = ({
         const endMs = (timelineConfig.range.end_seconds ?? 0) * 1000;
         const pixelPerMs = timelineConfig.cols.pixelPerMs;
         const paddingLeft = timelineConfig.editor.paddingLeft;
+        const labelHeight = timelineConfig.sections.labelHeight;
+
+        state.sectionRowAreas = timeline.state.sectionUuids
+            .map(uuid => {
+                const section = timeline.state.sectionsByUuid[uuid];
+                if (!section) return null;
+                const top = section.editorRelativeTop + labelHeight;
+                const height = section.editorRelativeBottom - top;
+                return { top, height };
+            })
+            .filter((a): a is { top: number, height: number } => a !== null && a.height > 0);
 
         const majorPositions: { ms: number, left: number }[] = [];
         const minorPositions: { ms: number, left: number }[] = [];
@@ -70,4 +84,5 @@ export type UseSnapGuideLinesType = ReturnType<typeof useSnapGuideLines>;
 export interface SnapGuideLinesStateInterface {
     majorGridPositions: { ms: number, left: number }[],
     minorGridPositions: { ms: number, left: number }[],
+    sectionRowAreas: { top: number, height: number }[],
 }

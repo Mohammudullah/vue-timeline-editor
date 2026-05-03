@@ -52,7 +52,10 @@ export const useSnapping = ({
             start_ms: 0,
             end_ms: 0,
             width: 0
-        }
+        },
+        // Active snap guide markers populated each pipeline run; consumers (e.g.
+        // <SnapGuideLines/>) render highlighted lines while dragging.
+        dragSnapGuides: [],
     });
 
 
@@ -260,6 +263,13 @@ export const useSnapping = ({
                 result.type === 'start'
                     ? result.value
                     : result.value - duration;
+
+            // Record the snapped edge as an active guide.
+            state.dragSnapGuides.push({
+                ms: result.value,
+                left: (result.value * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                source: 'frame-edge',
+            });
         }
 
         return { 
@@ -478,6 +488,12 @@ export const useSnapping = ({
 
         if(distanceToMajorGridStart <= majorGridIntervalThreshold) {
             
+            state.dragSnapGuides.push({
+                ms: majorGridStart,
+                left: (majorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                source: 'grid-major',
+            });
+
             const data = {
                 top,
                 left: (majorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
@@ -490,6 +506,12 @@ export const useSnapping = ({
 
 
         if(distanceToMajorGridEnd <= majorGridIntervalThreshold) {
+            state.dragSnapGuides.push({
+                ms: majorGridEnd,
+                left: (majorGridEnd * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                source: 'grid-major',
+            });
+
             const data = {
                 top,
                 left: ((majorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms)) * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
@@ -510,6 +532,12 @@ export const useSnapping = ({
         const distanceToMinorGridEnd = Math.abs(dependency.frame.end_ms - minorGridEnd);
 
         if(distanceToMinorGridStart <= minorGridIntervalThreshold) {
+            state.dragSnapGuides.push({
+                ms: minorGridStart,
+                left: (minorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                source: 'grid-minor',
+            });
+
             const data = {
                 top,
                 left: (minorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
@@ -521,6 +549,12 @@ export const useSnapping = ({
         }
 
         if(distanceToMinorGridEnd <= minorGridIntervalThreshold) {
+            state.dragSnapGuides.push({
+                ms: minorGridEnd,
+                left: (minorGridEnd * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                source: 'grid-minor',
+            });
+
             const data = {
                 top,
                 left: ((minorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms)) * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
@@ -628,7 +662,10 @@ export const useSnapping = ({
         if(currentRowUuid && currentRowUuid != activeRowCache.rowUuid) {
             cacheActiveRow(currentRowUuid);
         }
-        
+
+        // Reset active snap guide markers each tick; snap functions repopulate them.
+        state.dragSnapGuides = [];
+
         let snapPosition = {
             top: null as number | null,
             left: null as number | null,
@@ -704,6 +741,7 @@ export const useSnapping = ({
                 startMs: null,
                 endMs: null,
             }
+            state.dragSnapGuides = [];
         }
         else {
             calculateRowsCenterCache();
@@ -780,7 +818,8 @@ export interface SnappingStateInterface {
         start_ms: number,
         end_ms: number,
         width: number,
-    }
+    },
+    dragSnapGuides: { ms: number, left: number, source: 'grid-major' | 'grid-minor' | 'frame-edge' }[],
 }
 
 

@@ -47,6 +47,15 @@ watch(container, (newContainer) => {
             width: width + 'px',
         }"
     >
+        <!-- Resize handles sit on the container (outside the frame) so they
+             are not clipped by the frame's overflow:hidden -->
+        <div
+            class="vtd__frame-resize-left-handle vtd__row-frame-resize-handle no-dragging"
+            v-if="showResizeHandle"
+        >
+            <div class="vtd__row-frame-resize-handle-grip no-dragging"></div>
+        </div>
+
         <div 
             class="vtd__row-frame"
             :class="{
@@ -55,14 +64,6 @@ watch(container, (newContainer) => {
             style="overflow: hidden;"
             @click="emits('click', $event)"
         >
-
-            <div 
-                class="vtd__frame-resize-left-handle vtd__row-frame-resize-handle no-dragging"
-                v-if="showResizeHandle"
-            >
-
-            </div>
-
             <div class="vtd__row-frame-title">
                 {{ title }}
             </div>
@@ -79,13 +80,13 @@ watch(container, (newContainer) => {
             </div>
 
             <slot></slot>
+        </div>
 
-            <div 
-                class="vtd__frame-resize-right-handle vtd__row-frame-resize-handle no-dragging"
-                v-if="showResizeHandle"
-            >
-
-            </div>
+        <div
+            class="vtd__frame-resize-right-handle vtd__row-frame-resize-handle no-dragging"
+            v-if="showResizeHandle"
+        >
+            <div class="vtd__row-frame-resize-handle-grip no-dragging"></div>
         </div>
     </div>
 </template>

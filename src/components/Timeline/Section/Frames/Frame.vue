@@ -13,6 +13,8 @@ const props = withDefaults(defineProps<{
     selected?: boolean,
     draggable?: boolean,
     dragging?: boolean,
+    resizing?: boolean,
+    resizable?: boolean,
 }>(), {
     
 })
@@ -47,8 +49,8 @@ const container = computed<HTMLDivElement | null>(() => frameUi.value?.container
             'touch-action' : selected ? 'none' : 'auto'
         }"
         :selected="props.selected"
-        v-if="!dragging"
-        :show-resize-handle="props.selected && !props.dragging"
+        v-if="!dragging && !resizing"
+        :show-resize-handle="props.selected && !props.dragging && props.resizable"
     >
 
     </FrameUI>

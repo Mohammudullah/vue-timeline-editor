@@ -22,6 +22,7 @@ export const useDnd = ({
 
     const state = reactive<DndStateInterface>({
         dragging: false,
+        draggingMoved: false,
         container: {
             width: 0,
             height: 0,
@@ -68,6 +69,13 @@ export const useDnd = ({
     }
 
 
+    // Holds the initial pointerdown data for a frame that MIGHT become a drag.
+    // Actual drag activation (setPointerCapture, state.dragging) is deferred until
+    // the pointer moves more than DRAG_THRESHOLD pixels, so a quick click can
+    // still fire the 'click' event on the frame and trigger deselection.
+    let pendingDrag: { pointerId: number, clientX: number, clientY: number } | null = null;
+    const DRAG_THRESHOLD = 4;
+
     const startDrag = (event: PointerEvent) => {
 
         const frameContainer = frame.state.selected.container;
@@ -84,26 +92,34 @@ export const useDnd = ({
             return;
         }
 
+        // Record a pending drag — don't activate yet so 'click' can still fire
+        // on the frame for a quick tap (which would deselect it).
+        pendingDrag = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY };
+        setContainer(frameContainer);
+    }
+
+    const activateDrag = (event?: PointerEvent) => {
+        if (state.dragging || !pendingDrag || !frame.state.selected.frame) return;
+
         state.dragging = true;
+        state.draggingMoved = true;
         state.draggingFrame.data = frame.state.selected.frame;
         state.draggingFrame.uuid = frame.state.selected.uuid;
 
-        setContainer(frameContainer);
         setPlaceholderPosition();
         timeline.enableEdgeScrolling();
 
         if(timeline.state.editor) {
-
-            if(!timeline.state.editor.hasPointerCapture?.(event.pointerId)) {
-                timeline.state.editor.setPointerCapture(event.pointerId);
+            if(!timeline.state.editor.hasPointerCapture?.(pendingDrag.pointerId)) {
+                timeline.state.editor.setPointerCapture(pendingDrag.pointerId);
             }
         }
 
-        draggingEvents.triggerOnDragStart(state.draggingFrame.data!, event);
+        draggingEvents.triggerOnDragStart(state.draggingFrame.data!, event ?? new PointerEvent('pointerdown'));
     }
 
     const cancelDrag = (event: PointerEvent) => {
-
+        pendingDrag = null;
         if(!state.dragging) return;
 
         draggingEvents.triggerOnDragCancel(state.draggingFrame.data!, getDraggingFrameData(), event);
@@ -111,7 +127,7 @@ export const useDnd = ({
     }
 
     const drop = (event: PointerEvent) => {
-
+        pendingDrag = null;
         if(!state.dragging) return;
 
         draggingEvents.triggerOnDrop(state.draggingFrame.data!, getDraggingFrameData(), event);
@@ -123,6 +139,7 @@ export const useDnd = ({
         if(!state.dragging) return;
 
         state.dragging = false;
+        state.draggingMoved = false;
 
         if(timeline.state.editor) {
 
@@ -203,8 +220,17 @@ export const useDnd = ({
     watch([
         () => timeline.state.pointer.clientX,
         () => timeline.state.pointer.clientY,
-    
     ], () => {
+        // Activate drag once the pointer moves beyond the threshold. This keeps
+        // setPointerCapture away from quick clicks so 'click' can still fire on
+        // the frame element and trigger deselection.
+        if (pendingDrag && !state.dragging) {
+            const dx = Math.abs(timeline.state.pointer.clientX - pendingDrag.clientX);
+            const dy = Math.abs(timeline.state.pointer.clientY - pendingDrag.clientY);
+            if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                activateDrag();
+            }
+        }
         setPlaceholderPosition();
     })
 
@@ -230,6 +256,9 @@ export type UseDndType = ReturnType<typeof useDnd>;
 
 export interface DndStateInterface {
     dragging: boolean,
+    // True once the pointer moves more than 4px during the current drag session.
+    // Consumers can check this to distinguish a real drag from a quick click.
+    draggingMoved: boolean,
     draggingFrame: {
         data: TimelineFrameByUuidInterface | null,
         uuid: string | number | null,

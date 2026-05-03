@@ -20,8 +20,6 @@
 
 .vtd__snap-grid-line {
     position: absolute;
-    top: 0;
-    bottom: 0;
     width: 1px;
     pointer-events: none;
 }
@@ -101,4 +99,6 @@
 
 .vtd__row-frame-container {
     position: absolute;
+    /* Allow resize handles to protrude outside the container bounds */
+    overflow: visible;
 }

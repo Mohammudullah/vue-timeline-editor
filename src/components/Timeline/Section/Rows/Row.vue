@@ -39,6 +39,8 @@ const frameUuids = computed(() => props.timeline.state.sectionFrameUuids[props.u
             :selected = "features.data.frame.state.selected.uuid === uuid"
             :draggable="features.data.dnd != null && features.data.frame.state.selected.uuid === uuid"
             :dragging="features.data.dnd?.state.dragging && features.data.dnd.state.draggingFrame.uuid === uuid"
+            :resizing="features.data.resize?.state.resizing && features.data.resize.state.resizingFrame.uuid === uuid"
+            :resizable="features.data.resize != null"
             v-for="uuid in frameUuids"
             :key="uuid"
             :uuid="uuid"
