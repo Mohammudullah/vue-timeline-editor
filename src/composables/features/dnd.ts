@@ -35,6 +35,9 @@ export const useDnd = ({
             top: 0,
             start_ms: 0,
             end_ms: 0,
+            // When true, vertical position is locked to the original row.
+            // Set externally by features that enforce row constraints (e.g. JoinRows).
+            row_locked: false,
         },
         draggingFrame: {
             data: null,
@@ -164,6 +167,19 @@ export const useDnd = ({
         let left = timeline.state.pointer.editorRelativeX - state.container.pointerX;
         let top = timeline.state.pointer.editorRelativeY - state.container.pointerY;
 
+        // Row-lock: when an external feature (e.g. JoinRows) sets row_locked = true,
+        // override top with the original row's editorRelativeTop so the ghost
+        // always stays on the source row regardless of vertical pointer movement.
+        if (state.draggingPlaceholder.row_locked) {
+            const originalRowUuid = state.draggingFrame.data?.rowUuid;
+            const originalRow = originalRowUuid != null
+                ? timeline.state.sectionRowsByUuid[originalRowUuid]
+                : null;
+            if (originalRow != null) {
+                top = originalRow.editorRelativeTop;
+            }
+        }
+
         // Clamp the freeform ghost inside the editor bounds.
         // Done here (not in snapping) so the ghost preview itself never escapes the
         // editor — both the freeform ghost and the snap suggestion need this.
@@ -274,5 +290,7 @@ export interface DndStateInterface {
         top: number,
         start_ms: number,
         end_ms: number,
+        // Settable by external features. When true, dnd locks the ghost to the original row.
+        row_locked: boolean,
     }
 }

@@ -77,7 +77,7 @@ export const useFrames = ({
         deselectFrame,
         toggleFrame,
         syncSelectedContainer,
-        getFramePointerData
+        getFramePointerData,
     }
 }
 

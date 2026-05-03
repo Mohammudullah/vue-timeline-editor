@@ -234,7 +234,7 @@ export interface ResizeInterface {
         left: number,
         width: number,
         top: number,
-    }
+    },
 }
 
 export type UseResizeInterface = ReturnType<typeof useResize>;

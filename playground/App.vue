@@ -5,6 +5,7 @@ import Sections from '../src/components/Features/Sections.vue';
 import SnapGuideLines from '../src/components/Features/SnapGuideLines.vue';
 import Snapping from '../src/components/Features/Snapping.vue';
 import Timeline from '../src/components/Timeline.vue';
+import JoinRows from '../src/components/Features/JoinRows.vue';
 import '../src/styles/basic-theme.css';
 
 </script>
@@ -18,14 +19,15 @@ import '../src/styles/basic-theme.css';
                 title: 'Section 1',
                 uuid: 'section1',
                 rows: [
-                    {
+                    {   
                         uuid: 'row1',
                         title: 'Row 1',
                         frames: [{
                             uuid: 'frame1',
                             title: 'Frame 1',
                             start_ms: 0,
-                            end_ms: 2 * 60 * 60 * 1000
+                            end_ms: 2 * 60 * 60 * 1000,
+                            linkGroupUuid: 'group-a'
                         }]
                     },
                     {
@@ -42,7 +44,8 @@ import '../src/styles/basic-theme.css';
                                 uuid: 'row2-frame3',
                                 title: 'Frame 3',
                                 start_ms: 0,
-                                end_ms: 2 * 60 * 60 * 1000
+                                end_ms: 2 * 60 * 60 * 1000,
+                                linkGroupUuid: 'group-a'
                             }
                         ]
                     },
@@ -103,7 +106,8 @@ import '../src/styles/basic-theme.css';
                             uuid: 'frame8',
                             title: 'Frame 8',
                             start_ms: 2 * 60 * 60 * 1000,
-                            end_ms: 6 * 60 * 60 * 1000
+                            end_ms: 6 * 60 * 60 * 1000,
+                            linkGroupUuid: 'group-b'
                         }]
                     },
                     {
@@ -112,8 +116,9 @@ import '../src/styles/basic-theme.css';
                         frames: [{
                             uuid: 'frame9',
                             title: 'Frame 9',
-                            start_ms: 8 * 60 * 60 * 1000,
-                            end_ms: 9 * 60 * 60 * 1000
+                            start_ms: 2 * 60 * 60 * 1000,
+                            end_ms: 6 * 60 * 60 * 1000,
+                            linkGroupUuid: 'group-b'
                         }]
                     },
                     {
@@ -247,5 +252,6 @@ import '../src/styles/basic-theme.css';
         <Snapping/>
         <Resize/>
         <SnapGuideLines/>
+        <JoinRows/>
     </Timeline>
 </template>
