@@ -23,4 +23,4 @@ Designed for building booking systems, schedulers, and resource timelines with f
 ## 🚀 Installation
 
 ```bash
-npm install vue-timeline-editor
+npm install @mohammadullah/vue-timeline-editor

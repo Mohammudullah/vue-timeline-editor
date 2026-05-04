@@ -8,10 +8,10 @@ import { TimelineFrameByUuidInterface } from '../../types/timeline';
 import { DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
 
 const emits = defineEmits<{
-    'dragStart': [frame: TimelineFrameByUuidInterface, event: PointerEvent],
-    'dragEnd': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
-    'dragCancel': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
-    'drop': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'dragStart':  [frames: TimelineFrameByUuidInterface[], event: PointerEvent],
+    'dragEnd':    [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'dragCancel': [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'drop':       [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
 }>()
 
 const timeline = inject<UseTimelineInterface>('timeline');
@@ -26,7 +26,7 @@ if(!timeline || !timelineConfig || !features) {
 } else if(features.data.snapping) {
     console.error('Snapping feature is already enabled. Please check if <Snapping/> is mounted multiple times.');
 } else {
-    features.initFeature('snapping', () => useSnapping({ timeline, timelineConfig, dnd, resize }));
+    features.initFeature('snapping', () => useSnapping({ timeline, timelineConfig, frames: features.data.frames, dnd, resize }));
 }
 
 const snapping = computed(() => features?.data.snapping ?? null);
@@ -35,10 +35,10 @@ onUnmounted(() => {
     features?.destroyFeature('snapping');
 })
 
-snapping.value?.onDragStart((frame, event) => emits('dragStart', frame, event), 'snappingComponentOnDragStart');
-snapping.value?.onDragEnd((frame, frameData, event) => emits('dragEnd', frame, frameData, event), 'snappingComponentOnDragEnd');
-snapping.value?.onDragCancel((frame, frameData, event) => emits('dragCancel', frame, frameData, event), 'snappingComponentOnDragCancel');
-snapping.value?.onDrop((frame, frameData, event) => emits('drop', frame, frameData, event), 'snappingComponentOnDrop');
+snapping.value?.onDragStart((frames, event) => emits('dragStart', frames, event), 'snappingComponentOnDragStart');
+snapping.value?.onDragEnd((frames, frameData, event) => emits('dragEnd', frames, frameData, event), 'snappingComponentOnDragEnd');
+snapping.value?.onDragCancel((frames, frameData, event) => emits('dragCancel', frames, frameData, event), 'snappingComponentOnDragCancel');
+snapping.value?.onDrop((frames, frameData, event) => emits('drop', frames, frameData, event), 'snappingComponentOnDrop');
 
 </script>
 

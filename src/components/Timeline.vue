@@ -172,7 +172,7 @@ onMounted(() => {
      </pre>
     <!--<br/>
     <pre>
-        {{ features.data.frame.state.selected }}
+        {{ features.data.frames.state.primary }}
     </pre>
 
     <pre>

@@ -1,55 +1,55 @@
 import { reactive, watchEffect } from "vue";
 import { UseTimelineInterface } from "../timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
-import { TimelineFrameByUuidInterface } from "../../types/timeline";
-import { UseDndType } from "./dnd";
+import { UseDndType, DraggingPlaceholderInterface } from "./dnd";
 import { UseResizeInterface } from "./resize";
+import { UseFramesType } from "./frames";
 
 /**
  * useJoinRows
  *
- * Manages linked-frame groups (joined rows). Frames sharing the same
+ * Linked-frame groups (joined bookings). Frames sharing the same
  * `linkGroupUuid` belong to one logical booking that spans multiple rows.
  *
- * Responsibilities:
- *  - Maintains a reactive group map: groupUuid → frame uuids[]
- *  - Exposes helpers consumed by Dnd and Resize to keep all members in sync
- *  - Exposes group membership so Row/Frame can highlight all members together
- *
- * Design rules (per spec):
- *  - All members always share the same start_ms / end_ms
- *  - Row assignment never changes when dragging — only time shifts
+ * Responsibilities (post-refactor):
+ *  1. Maintain a reactive group map: groupUuid → frame uuids[]
+ *  2. **Selection expansion** — when a frame is selected (becomes primary)
+ *     and that frame belongs to a group, every other group member is
+ *     auto-added to `frames.state.selectedUuids`. From there, dnd/resize
+ *     pick up the rest of the group automatically; this composable no
+ *     longer writes ghost placeholders.
+ *  3. Drive `dnd.state.rowLocked` so a grouped drag stays on its row.
+ *  4. Provide visual helpers (`getGhostLinkFlags`) so Vue templates can
+ *     render the connected-edge style without doing the math themselves.
  */
 export const useJoinRows = ({
     timeline,
     timelineConfig,
+    frames,
     getDnd = () => null,
     getResize = () => null,
 }: {
     timeline: UseTimelineInterface,
     timelineConfig: TimelineConfigInterface,
+    frames: UseFramesType,
     getDnd?: () => UseDndType | null,
     getResize?: () => UseResizeInterface | null,
 }) => {
+    void getResize;
 
     const state = reactive<JoinRowsStateInterface>({
-        // groupUuid → array of frame uuids belonging to that group
         groups: {},
-        // frameUuid → groupUuid (reverse index for O(1) lookup)
         frameGroupMap: {},
     });
 
-    // Keep group maps in sync whenever timeline frame data changes.
+    // Keep group maps in sync with timeline frame data.
     watchEffect(() => {
         const groups: Record<string | number, (string | number)[]> = {};
         const frameGroupMap: Record<string | number, string | number> = {};
 
         Object.values(timeline.state.sectionFramesByUuid).forEach(frame => {
             if (frame.linkGroupUuid == null) return;
-
-            if (!groups[frame.linkGroupUuid]) {
-                groups[frame.linkGroupUuid] = [];
-            }
+            if (!groups[frame.linkGroupUuid]) groups[frame.linkGroupUuid] = [];
             groups[frame.linkGroupUuid].push(frame.uuid);
             frameGroupMap[frame.uuid] = frame.linkGroupUuid;
         });
@@ -58,89 +58,27 @@ export const useJoinRows = ({
         state.frameGroupMap = frameGroupMap;
     });
 
-    // Drive dnd.row_locked: true while the dragging frame belongs to a link group.
-    // Cleared automatically when dragging stops (draggingFrame.uuid becomes null).
+    // Selection expansion: when primary changes and the primary belongs to a
+    // group, add every other group member to the selection.
+    watchEffect(() => {
+        const primaryUuid = frames.state.primary.uuid;
+        if (primaryUuid == null) return;
+        const members = getGroupMembers(primaryUuid);
+        const others = members.filter(u => u !== primaryUuid);
+        if (others.length > 0) frames.addToSelection(others);
+    });
+
+    // Drive dnd.row_locked: true while the dragging primary belongs to a group.
     watchEffect(() => {
         const dnd = getDnd();
         if (!dnd) return;
         const uuid = dnd.state.draggingFrame.uuid;
-        dnd.state.rowLocked =
-            uuid != null && isLinked(uuid);
-    });
-
-    // Write drag ghost entries for all group members while the primary frame is dragging.
-    // Each member ghost tracks the same time delta as the primary but stays on its own row.
-    watchEffect(() => {
-        const dnd = getDnd();
-        if (!dnd) return;
-        const primaryUuid = dnd.state.draggingFrame.uuid;
-        if (primaryUuid == null) return;
-
-        const primaryEntry = dnd.state.draggingPlaceholders[primaryUuid];
-        if (!primaryEntry) return;
-
-        const primaryFrameData = dnd.state.draggingFrame.data;
-        if (!primaryFrameData) return;
-
-        const delta_ms = primaryEntry.start_ms - primaryFrameData.start_ms;
-
-        getGroupMembers(primaryUuid).forEach(memberUuid => {
-            if (memberUuid === primaryUuid) return;
-
-            const memberFrame = timeline.state.sectionFramesByUuid[memberUuid];
-            if (!memberFrame) return;
-
-            const memberRow = timeline.state.sectionRowsByUuid[memberFrame.rowUuid];
-            const start_ms = memberFrame.start_ms + delta_ms;
-            const end_ms = memberFrame.end_ms + delta_ms;
-            const left = (start_ms * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
-
-            dnd.state.draggingPlaceholders[memberUuid] = {
-                uuid: memberUuid,
-                rowUuid: memberFrame.rowUuid,
-                start_ms,
-                end_ms,
-                left,
-                width: memberFrame.width,
-                top: memberRow?.editorRelativeTop ?? 0,
-            };
-        });
-    });
-
-    // Write resize ghost entries for all group members while the primary frame is resizing.
-    // All members share the same start/end times as the primary; only top differs per row.
-    watchEffect(() => {
-        const resize = getResize();
-        if (!resize) return;
-        const primaryUuid = resize.state.resizingFrame.uuid;
-        if (primaryUuid == null) return;
-
-        const primaryEntry = resize.state.resizingPlaceholders[primaryUuid];
-        if (!primaryEntry) return;
-
-        getGroupMembers(primaryUuid).forEach(memberUuid => {
-            if (memberUuid === primaryUuid) return;
-
-            const memberFrame = timeline.state.sectionFramesByUuid[memberUuid];
-            if (!memberFrame) return;
-
-            const memberRow = timeline.state.sectionRowsByUuid[memberFrame.rowUuid];
-
-            resize.state.resizingPlaceholders[memberUuid] = {
-                uuid: memberUuid,
-                rowUuid: memberFrame.rowUuid,
-                start_ms: primaryEntry.start_ms,
-                end_ms: primaryEntry.end_ms,
-                left: primaryEntry.left,
-                width: primaryEntry.width,
-                top: memberRow?.editorRelativeTop ?? 0,
-            };
-        });
+        dnd.state.rowLocked = uuid != null && isLinked(uuid);
     });
 
     /**
      * Returns all frame uuids in the same link group as `frameUuid`.
-     * Returns an empty array if the frame is not part of any group.
+     * Empty array if not part of any group.
      */
     const getGroupMembers = (frameUuid: string | number): (string | number)[] => {
         const groupUuid = state.frameGroupMap[frameUuid];
@@ -148,41 +86,76 @@ export const useJoinRows = ({
         return state.groups[groupUuid] ?? [];
     };
 
+    const isLinked = (frameUuid: string | number): boolean =>
+        state.frameGroupMap[frameUuid] != null;
+
+    const getGroupUuid = (frameUuid: string | number): string | number | null =>
+        state.frameGroupMap[frameUuid] ?? null;
+
     /**
-     * Returns true if the frame belongs to a link group.
+     * Visual helper for ghost rendering. Given a ghost-placeholder map and a
+     * uuid, returns whether the entry has a linked sibling immediately
+     * above / below it. Templates use these flags to flatten the shared
+     * border so adjacent ghosts look connected.
+     *
+     * @param uuid     frame uuid to inspect
+     * @param ghostMap the active placeholder map (e.g. dnd.state.draggingPlaceholders)
      */
-    const isLinked = (frameUuid: string | number): boolean => {
-        return state.frameGroupMap[frameUuid] != null;
+    const getGhostLinkFlags = (
+        uuid: string | number,
+        ghostMap: Record<string | number, DraggingPlaceholderInterface>,
+    ): { linkedAbove: boolean, linkedBelow: boolean } => {
+        const rowHeight = timelineConfig.rows.height ?? 0;
+        const myGroup = state.frameGroupMap[uuid];
+        if (myGroup == null) return { linkedAbove: false, linkedBelow: false };
+
+        const me = ghostMap[uuid];
+        if (!me) return { linkedAbove: false, linkedBelow: false };
+
+        const sorted = Object.values(ghostMap).sort((a, b) => a.top - b.top);
+        const idx = sorted.findIndex(e => e.uuid === uuid);
+
+        const linkedAbove = idx > 0
+            && Math.abs(sorted[idx - 1].top - me.top) <= rowHeight
+            && state.frameGroupMap[sorted[idx - 1].uuid] === myGroup;
+
+        const linkedBelow = idx >= 0 && idx < sorted.length - 1
+            && Math.abs(sorted[idx + 1].top - me.top) <= rowHeight
+            && state.frameGroupMap[sorted[idx + 1].uuid] === myGroup;
+
+        return { linkedAbove: !!linkedAbove, linkedBelow: !!linkedBelow };
     };
 
     /**
-     * Returns the groupUuid for a frame, or null if not linked.
+     * Returns whether a static (non-ghost) frame has a linked sibling on
+     * the row immediately above / below it. Used by Frame.vue to flatten
+     * the shared border for the resting connected look.
      */
-    const getGroupUuid = (frameUuid: string | number): string | number | null => {
-        return state.frameGroupMap[frameUuid] ?? null;
-    };
+    const getStaticLinkFlags = (
+        uuid: string | number,
+    ): { linkedAbove: boolean, linkedBelow: boolean } => {
+        const f = timeline.state.sectionFramesByUuid[uuid];
+        if (!f?.linkGroupUuid) return { linkedAbove: false, linkedBelow: false };
 
-    /**
-     * Syncs all other group members to the given start/end times.
-     * Called by Dnd and Resize after the primary frame is updated.
-     * Skips `sourceFrameUuid` itself (already updated by the caller).
-     */
-    const syncGroupTimes = (
-        sourceFrameUuid: string | number,
-        start_ms: number,
-        end_ms: number,
-    ): void => {
-        const members = getGroupMembers(sourceFrameUuid);
-        members.forEach(uuid => {
-            if (uuid === sourceFrameUuid) return;
-            const frame = timeline.state.sectionFramesByUuid[uuid];
-            if (!frame) return;
-            timeline.updateFrame(uuid, {
-                ...frame,
-                start_ms,
-                end_ms,
+        const sectionUuid = f.sectionUuid;
+        if (sectionUuid == null) return { linkedAbove: false, linkedBelow: false };
+        const rowUuids = timeline.state.sectionRowUuids[sectionUuid] ?? [];
+        const idx = rowUuids.indexOf(f.rowUuid);
+        if (idx < 0) return { linkedAbove: false, linkedBelow: false };
+
+        const linkUuid = f.linkGroupUuid;
+        const groupMembers = state.groups[linkUuid] ?? [];
+
+        const hasMemberInRow = (rowUuid: string | number) =>
+            groupMembers.some(memberUuid => {
+                const mf = timeline.state.sectionFramesByUuid[memberUuid];
+                return mf && mf.rowUuid === rowUuid;
             });
-        });
+
+        const linkedAbove = idx > 0 && hasMemberInRow(rowUuids[idx - 1]);
+        const linkedBelow = idx < rowUuids.length - 1 && hasMemberInRow(rowUuids[idx + 1]);
+
+        return { linkedAbove, linkedBelow };
     };
 
     return {
@@ -190,7 +163,8 @@ export const useJoinRows = ({
         getGroupMembers,
         isLinked,
         getGroupUuid,
-        syncGroupTimes,
+        getGhostLinkFlags,
+        getStaticLinkFlags,
     };
 };
 

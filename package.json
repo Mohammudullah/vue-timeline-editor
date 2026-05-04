@@ -1,6 +1,6 @@
 {
-    "name": "vue-timeline-editor",
-    "version": "0.0.1",
+    "name": "@mohammadullah/vue-timeline-editor",
+    "version": "0.0.2",
     "description": "Interactive timeline editor for Vue 3 (drag, resize, zoom)",
     "author": "Mohammadullah",
     "license": "MIT",

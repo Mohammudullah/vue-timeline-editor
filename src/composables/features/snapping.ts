@@ -1,21 +1,23 @@
 import { computed, reactive, Ref, watch } from "vue";
 import { UseTimelineInterface } from "../timeline";
 import { TimelineConfigInterface } from "../timelineConfig";
-import { UseFeaturesType } from "./features";
 import { DraggingPlaceholderInterface, UseDndType } from "./dnd";
 import { TimelineFrameByUuidInterface } from "../../types/timeline";
 import { DraggedFrameDataInterface, FrameDataItem, ResizedFrameDataInterface, useDraggingEvents } from "./draggingEvents";
 import { UseResizeInterface } from "./resize";
+import { UseFramesType } from "./frames";
 import useUtils from "../utils";
 
 export const useSnapping = ({
     timeline,
     timelineConfig,
+    frames,
     dnd,
     resize,
 } : {
     timeline: UseTimelineInterface,
     timelineConfig: TimelineConfigInterface,
+    frames: UseFramesType,
     dnd: Ref<UseDndType | null>,
     resize: Ref<UseResizeInterface | null>,
 }) => {
@@ -121,11 +123,22 @@ export const useSnapping = ({
     };
 
 
-    const getDraggingFrameData = () : DraggedFrameDataInterface => {
+    const getDraggingFrameData = (upstream?: DraggedFrameDataInterface) : DraggedFrameDataInterface => {
 
         const primaryUuid = dnd.value?.state.draggingFrame.uuid;
         const primaryPlaceholder = primaryUuid != null ? state.draggingPlaceholders[primaryUuid] : null;
         const currentRow = setFrameOverRow(primaryPlaceholder?.top ?? 0);
+
+        // Index upstream initial entries by uuid so we can pair them with our
+        // own snapped placeholders. Upstream `initial` is the canonical pre-drag
+        // snapshot built by dnd before any updateFrame call could mutate the
+        // live frame map; we MUST use it instead of reading sectionFramesByUuid
+        // here, otherwise post-drop event payloads receive corrupted initial
+        // data (drop handler runs first and mutates the live map).
+        const upstreamInitialByUuid: Record<string | number, FrameDataItem> = {};
+        if (upstream) {
+            for (const item of upstream.initial) upstreamInitialByUuid[item.uuid] = item;
+        }
 
         const initial: FrameDataItem[] = [];
         const current: FrameDataItem[] = [];
@@ -136,7 +149,8 @@ export const useSnapping = ({
         );
 
         entries.forEach(entry => {
-            const originalFrame = timeline.state.sectionFramesByUuid[entry.uuid];
+            const upstreamInitial = upstreamInitialByUuid[entry.uuid];
+            const originalFrame = upstreamInitial ?? timeline.state.sectionFramesByUuid[entry.uuid];
             initial.push({
                 uuid: entry.uuid,
                 sectionUuid: originalFrame?.sectionUuid ?? null,
@@ -158,9 +172,19 @@ export const useSnapping = ({
     }
     
     
-    const getResizingFrameData = () : ResizedFrameDataInterface => {
+    const getResizingFrameData = (upstream?: ResizedFrameDataInterface) : ResizedFrameDataInterface => {
 
         const primaryUuid = resize.value?.state.resizingFrame.uuid;
+
+        // See `getDraggingFrameData` for the rationale: upstream's `initial`
+        // is the canonical pre-resize snapshot built before any updateFrame
+        // call could mutate the live frame map. We MUST use it instead of
+        // re-reading sectionFramesByUuid here, otherwise post-resize event
+        // payloads receive corrupted initial data.
+        const upstreamInitialByUuid: Record<string | number, FrameDataItem> = {};
+        if (upstream) {
+            for (const item of upstream.initial) upstreamInitialByUuid[item.uuid] = item;
+        }
 
         const initial: FrameDataItem[] = [];
         const current: FrameDataItem[] = [];
@@ -170,7 +194,8 @@ export const useSnapping = ({
         );
 
         entries.forEach(entry => {
-            const originalFrame = timeline.state.sectionFramesByUuid[entry.uuid];
+            const upstreamInitial = upstreamInitialByUuid[entry.uuid];
+            const originalFrame = upstreamInitial ?? timeline.state.sectionFramesByUuid[entry.uuid];
             initial.push({
                 uuid: entry.uuid,
                 sectionUuid: originalFrame?.sectionUuid ?? null,
@@ -326,16 +351,22 @@ export const useSnapping = ({
         endMs: null as number | null,
     }
 
-    // Returns frames sharing `primaryUuid`'s linkGroupUuid (excluding the primary
-    // itself). Reads directly from timeline state — independent of any feature's
-    // reactive update timing, so it's safe to use from tick 1.
-    const getLinkedSiblings = (primaryUuid: string | number) => {
-        const primary = timeline.state.sectionFramesByUuid[primaryUuid];
-        if (!primary || primary.linkGroupUuid == null) return [];
-        const linkUuid = primary.linkGroupUuid;
-        return Object.values(timeline.state.sectionFramesByUuid).filter(
-            f => f.linkGroupUuid === linkUuid && f.uuid !== primaryUuid
-        );
+    // Returns the frames that should move/resize together with the primary —
+    // i.e. every selected frame except the primary itself. Reads directly from
+    // `frames.state.selectedUuids` so it's available on tick 1 of any drag/resize
+    // (no dependency on feature watchEffect timing).
+    //
+    // Selection is the universal "move-together" set: it covers JoinRows
+    // (members auto-added by joinRows' watchEffect on primary change) and any
+    // future multi-select source (shift-click, marquee, programmatic API).
+    const getSelectionSiblings = (primaryUuid: string | number): TimelineFrameByUuidInterface[] => {
+        const out: TimelineFrameByUuidInterface[] = [];
+        for (const u of frames.state.selectedUuids) {
+            if (u === primaryUuid) continue;
+            const f = timeline.state.sectionFramesByUuid[u];
+            if (f) out.push(f);
+        }
+        return out;
     };
 
     const protectOverLappingFrames = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
@@ -794,15 +825,15 @@ export const useSnapping = ({
             width: freeformPrimary.width,
         };
 
-        // If any LINKED SIBLING would overlap in their own row at the validated
-        // primary times, revert primary to the last position the group was fully
-        // safe at. Sibling list comes from timeline state directly to avoid any
-        // dependency on joinRows watchEffect timing.
+        // If any selection sibling would overlap in their own row at the
+        // validated primary times, revert primary to the last position the
+        // group was fully safe at. Sibling list comes from frames.state.selectedUuids
+        // (synchronously available — no watchEffect timing dependency).
         let validatedPrimary = state.draggingPlaceholders[primaryUuid];
-        const linkedSiblings = getLinkedSiblings(primaryUuid);
+        const siblings = getSelectionSiblings(primaryUuid);
         let anyMemberBlocked = false;
 
-        for (const sibling of linkedSiblings) {
+        for (const sibling of siblings) {
             if (wouldOverlapInRow(sibling.rowUuid, validatedPrimary.start_ms, validatedPrimary.end_ms, sibling.uuid)) {
                 anyMemberBlocked = true;
                 break;
@@ -826,8 +857,7 @@ export const useSnapping = ({
             // approving member-blocking positions on subsequent ticks.
             lastNotOverflowedPosition = { ...lastGroupSafeDragPosition };
             validatedPrimary = state.draggingPlaceholders[primaryUuid];
-        } else if (linkedSiblings.length > 0) {
-            // Group fully safe — advance the group tracker.
+        } else if (siblings.length > 0) {
             lastGroupSafeDragPosition = {
                 top: validatedPrimary.top,
                 left: validatedPrimary.left,
@@ -836,10 +866,8 @@ export const useSnapping = ({
             };
         }
 
-        // Mirror validated primary times to all linked siblings. Use getLinkedSiblings
-        // (reads directly from timeline state) instead of dnd.state.draggingPlaceholders
-        // so members are present on tick 1 before joinRows watchEffect fires.
-        linkedSiblings.forEach(sibling => {
+        // Mirror validated primary times to every sibling on its own row.
+        siblings.forEach(sibling => {
             const memberRow = timeline.state.sectionRowsByUuid[sibling.rowUuid];
             state.draggingPlaceholders[sibling.uuid] = {
                 uuid: sibling.uuid,
@@ -851,6 +879,15 @@ export const useSnapping = ({
                 width: sibling.width,
             };
         });
+
+        // Drop entries for uuids no longer in the selection (e.g. selection was cleared mid-drag).
+        for (const ghostUuid of Object.keys(state.draggingPlaceholders)) {
+            if (ghostUuid === String(primaryUuid)) continue;
+            if (!frames.state.selectedUuids.includes(ghostUuid)
+                && !frames.state.selectedUuids.includes(Number(ghostUuid))) {
+                delete state.draggingPlaceholders[ghostUuid];
+            }
+        }
     }
 
 
@@ -901,14 +938,14 @@ export const useSnapping = ({
             width: calculateFrameWidth(start_ms, end_ms, timelineConfig.cols.pixelPerMs),
         };
 
-        // If any LINKED SIBLING would overlap at the validated primary times,
-        // revert to the last known safe group position. Sibling list comes from
-        // timeline state directly (no joinRows timing dependency).
+        // If any selection sibling would overlap at the validated primary
+        // times, revert to the last known safe group position. Siblings come
+        // from frames.state.selectedUuids (no watchEffect timing dependency).
         let validatedResizePrimary = state.resizingPlaceholders[primaryUuid];
-        const linkedResizeSiblings = getLinkedSiblings(primaryUuid);
+        const resizeSiblings = getSelectionSiblings(primaryUuid);
         let anyResizeMemberBlocked = false;
 
-        for (const sibling of linkedResizeSiblings) {
+        for (const sibling of resizeSiblings) {
             if (wouldOverlapInRow(sibling.rowUuid, validatedResizePrimary.start_ms, validatedResizePrimary.end_ms, sibling.uuid)) {
                 anyResizeMemberBlocked = true;
                 break;
@@ -929,7 +966,7 @@ export const useSnapping = ({
             };
             lastNotOverflowedPosition = { ...lastGroupSafeResizePosition };
             validatedResizePrimary = state.resizingPlaceholders[primaryUuid];
-        } else if (linkedResizeSiblings.length > 0) {
+        } else if (resizeSiblings.length > 0) {
             lastGroupSafeResizePosition = {
                 top: validatedResizePrimary.top,
                 left: validatedResizePrimary.left,
@@ -938,10 +975,8 @@ export const useSnapping = ({
             };
         }
 
-        // Mirror validated primary times to all linked siblings. Use getLinkedSiblings
-        // (reads directly from timeline state) instead of resize.state.resizingPlaceholders
-        // so members are always present on tick 1, before joinRows watchEffect fires.
-        linkedResizeSiblings.forEach(sibling => {
+        // Mirror validated primary times to every sibling on its own row.
+        resizeSiblings.forEach(sibling => {
             const memberRow = timeline.state.sectionRowsByUuid[sibling.rowUuid];
             const mStart = validatedResizePrimary.start_ms;
             const mEnd = validatedResizePrimary.end_ms;
@@ -955,6 +990,15 @@ export const useSnapping = ({
                 width: calculateFrameWidth(mStart, mEnd, timelineConfig.cols.pixelPerMs),
             };
         });
+
+        // Drop entries for uuids no longer in the selection.
+        for (const ghostUuid of Object.keys(state.resizingPlaceholders)) {
+            if (ghostUuid === String(primaryUuid)) continue;
+            if (!frames.state.selectedUuids.includes(ghostUuid)
+                && !frames.state.selectedUuids.includes(Number(ghostUuid))) {
+                delete state.resizingPlaceholders[ghostUuid];
+            }
+        }
     }
 
     watch([() => timeline.state.pointer.clientX, () => timeline.state.pointer.clientY, () => dnd.value?.state.dragging], snapOnDragPipeline, { deep: true });
@@ -1019,10 +1063,10 @@ export const useSnapping = ({
         oldDnd?.removeEvent('dragCancel', 'snappingComposableOnDragCancel');
         oldDnd?.removeEvent('drop', 'snappingComposableOnDrop');
 
-        newDnd?.onDragStart((frame, event) => draggingEvents.triggerOnDragStart(frame, event), 'snappingComposableOnDragStart');
-        newDnd?.onDragEnd((frame, frameData, event) => draggingEvents.triggerOnDragEnd(frame, getDraggingFrameData(), event), 'snappingComposableOnDragEnd');
-        newDnd?.onDragCancel((frame, frameData, event) => draggingEvents.triggerOnDragCancel(frame, getDraggingFrameData(), event), 'snappingComposableOnDragCancel');
-        newDnd?.onDrop((frame, frameData, event) => draggingEvents.triggerOnDrop(frame, getDraggingFrameData(), event), 'snappingComposableOnDrop');
+        newDnd?.onDragStart((dragFrames, event) => draggingEvents.triggerOnDragStart(dragFrames, event), 'snappingComposableOnDragStart');
+        newDnd?.onDragEnd((dragFrames, frameData, event) => draggingEvents.triggerOnDragEnd(dragFrames, getDraggingFrameData(frameData), event), 'snappingComposableOnDragEnd');
+        newDnd?.onDragCancel((dragFrames, frameData, event) => draggingEvents.triggerOnDragCancel(dragFrames, getDraggingFrameData(frameData), event), 'snappingComposableOnDragCancel');
+        newDnd?.onDrop((dragFrames, frameData, event) => draggingEvents.triggerOnDrop(dragFrames, getDraggingFrameData(frameData), event), 'snappingComposableOnDrop');
     }, { immediate: true })
 
 
@@ -1031,10 +1075,10 @@ export const useSnapping = ({
         oldResize?.removeEvent('resizeEnd', 'snappingComposableOnResizeEnd');
         oldResize?.removeEvent('resizeCancel', 'snappingComposableOnResizeCancel');
 
-        newResize?.onResizeStart((frame, event) => draggingEvents.triggerOnResizeStart(frame, event), 'snappingComposableOnResizeStart');
-        newResize?.onResizeEnd((frame, frameData, event) => draggingEvents.triggerOnResizeEnd(frame, getResizingFrameData(), event), 'snappingComposableOnResizeEnd');
-        newResize?.onResized((frame, frameData, event) => draggingEvents.triggerOnResized(frame, getResizingFrameData(), event), 'snappingComposableOnResized');
-        newResize?.onResizeCancel((frame, frameData, event) => draggingEvents.triggerOnResizeCancel(frame, getResizingFrameData(), event), 'snappingComposableOnResizeCancel');
+        newResize?.onResizeStart((resizeFrames, event) => draggingEvents.triggerOnResizeStart(resizeFrames, event), 'snappingComposableOnResizeStart');
+        newResize?.onResizeEnd((resizeFrames, frameData, event) => draggingEvents.triggerOnResizeEnd(resizeFrames, getResizingFrameData(frameData), event), 'snappingComposableOnResizeEnd');
+        newResize?.onResized((resizeFrames, frameData, event) => draggingEvents.triggerOnResized(resizeFrames, getResizingFrameData(frameData), event), 'snappingComposableOnResized');
+        newResize?.onResizeCancel((resizeFrames, frameData, event) => draggingEvents.triggerOnResizeCancel(resizeFrames, getResizingFrameData(frameData), event), 'snappingComposableOnResizeCancel');
     }, { immediate: true })
 
 

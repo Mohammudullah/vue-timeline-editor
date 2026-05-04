@@ -36,8 +36,8 @@ const frameUuids = computed(() => props.timeline.state.sectionFrameUuids[props.u
         }"
     >
         <Frame
-            :selected = "features.data.selectedFrames.isFrameSelected(uuid)"
-            :draggable="features.data.dnd != null && features.data.frame.state.selected.uuid === uuid"
+            :selected = "features.data.frames.isFrameSelected(uuid)"
+            :draggable="features.data.dnd != null && features.data.frames.isFrameSelected(uuid)"
             :dragging="features.data.dnd?.dragging(uuid)"
             :resizing="features.data.resize?.resizing(uuid)"
             :resizable="features.data.resize != null"

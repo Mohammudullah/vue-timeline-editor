@@ -38,7 +38,7 @@ if (!timeline || !timelineConfig || !features) {
 } else if (features.data.joinRows) {
     console.error('JoinRows feature is already enabled. Please check if <JoinRows/> is mounted multiple times.');
 } else {
-    features.initFeature('joinRows', () => useJoinRows({ timeline, timelineConfig, getDnd: () => features.data.dnd, getResize: () => features.data.resize }));
+    features.initFeature('joinRows', () => useJoinRows({ timeline, timelineConfig, frames: features.data.frames, getDnd: () => features.data.dnd, getResize: () => features.data.resize }));
 }
 
 onUnmounted(() => {

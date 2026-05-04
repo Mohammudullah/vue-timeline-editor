@@ -15,11 +15,11 @@ const props = withDefaults(defineProps<{
 })
 
 const frameClick = (event : PointerEvent, frame: TimelineFrameByUuidInterface, container: HTMLDivElement, uuid: string | number) => {
-    props.features.data.frame.toggleFrame(event, frame, container, uuid)
+    props.features.data.frames.toggleFrame(event, frame, container, uuid)
 }
 
 const frameContainerUpdate = (container: HTMLDivElement | null, frame: TimelineFrameByUuidInterface, uuid: string | number) => {
-    props.features.data.frame.syncSelectedContainer(container, frame, uuid)
+    props.features.data.frames.syncSelectedContainer(container, frame, uuid)
 }
 
 

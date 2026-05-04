@@ -1,13 +1,12 @@
-<script setup lang="ts">
-import { computed, inject, onUnmounted, Teleport } from 'vue';
+<script lang="ts" setup>
+import { computed, inject, onUnmounted, watch } from 'vue';
 import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
-import { useDnd, UseDndType, DraggingPlaceholderInterface } from '../../composables/features/dnd';
+import { useDnd, UseDndType } from '../../composables/features/dnd';
 import FrameUI from '../Timeline/UI/FrameUI.vue';
 import { TimelineFrameByUuidInterface } from '../../types/timeline';
 import { DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
-import { watch } from 'vue';
 
 const props = withDefaults(defineProps<{
     edgeSnap?: boolean,
@@ -16,70 +15,47 @@ const props = withDefaults(defineProps<{
 });
 
 const emits = defineEmits<{
-    'dragStart': [frame: TimelineFrameByUuidInterface, event: PointerEvent],
-    'dragEnd': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
-    'dragCancel': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
-    'drop': [frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent],
-}>()
+    'dragStart':  [frames: TimelineFrameByUuidInterface[], event: PointerEvent],
+    'dragEnd':    [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'dragCancel': [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'drop':       [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+}>();
 
 const timeline = inject<UseTimelineInterface>('timeline');
 const timelineConfig = inject<TimelineConfigInterface>('timelineConfig');
 const features = inject<ReturnType<typeof useFeatures>>('features');
 
-if(!timeline || !timelineConfig || !features) {
+if (!timeline || !timelineConfig || !features) {
     console.error('Timeline, TimelineConfig, and Features must be provided');
-} else if(features.data.dnd) {
+} else if (features.data.dnd) {
     console.error('Dnd feature is already enabled. Please check if <Dnd/> is mounted multiple times.');
 } else {
-    features.initFeature('dnd', () => useDnd({ timeline, timelineConfig, frame: features.data.frame, edgeSnap: props.edgeSnap }));
+    features.initFeature('dnd', () =>
+        useDnd({ timeline, timelineConfig, frames: features.data.frames, edgeSnap: props.edgeSnap }),
+    );
 }
 
 const dnd = computed<UseDndType | null>(() => features?.data.dnd ?? null);
 const activeHandler = computed(() => features?.data.snapping || features?.data.dnd || null);
 
-// Sorted ghost entries by vertical position — used to determine which ghost
-// entries are adjacent to a linked sibling so the connected edge style applies.
-const sortedGhostEntries = computed(() => {
-    return Object.values(dnd.value?.state.draggingPlaceholders ?? {}).sort((a, b) => a.top - b.top);
-});
-
-// Returns { linkedAbove, linkedBelow } flags for a given ghost placeholder
-// entry. Two entries are considered adjacent when they are vertically one
-// row-height apart and share the same linkGroupUuid.
-const getGhostLinkFlags = (entry: DraggingPlaceholderInterface) => {
-    const rowHeight = timelineConfig?.rows.height ?? 0;
-    const myGroup = dnd.value?.draggingFrame(entry.uuid)?.linkGroupUuid;
-    if (!myGroup) return { linkedAbove: false, linkedBelow: false };
-    const sorted = sortedGhostEntries.value;
-    const idx = sorted.findIndex(e => e.uuid === entry.uuid);
-    const linkedAbove = idx > 0
-        && Math.abs(sorted[idx - 1].top - entry.top) <= rowHeight
-        && dnd.value?.draggingFrame(sorted[idx - 1].uuid)?.linkGroupUuid === myGroup;
-    const linkedBelow = idx >= 0 && idx < sorted.length - 1
-        && Math.abs(sorted[idx + 1].top - entry.top) <= rowHeight
-        && dnd.value?.draggingFrame(sorted[idx + 1].uuid)?.linkGroupUuid === myGroup;
-    return { linkedAbove: !!linkedAbove, linkedBelow: !!linkedBelow };
+const handleOnDragStart = (frames: TimelineFrameByUuidInterface[], event: PointerEvent) => {
+    emits('dragStart', frames, event);
+    console.log('Drag started:', frames);
 };
-
-
-const handleOnDragStart = (frame: TimelineFrameByUuidInterface, event: PointerEvent) => {
-    emits('dragStart', frame, event);
+const handleOnDragEnd = (frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => {
+    emits('dragEnd', frames, frameData, event);
+    console.log('Drag ended:', frames, frameData);
 };
-
-const handleOnDragEnd = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-    emits('dragEnd', frame, frameData, event);
+const handleOnDragCancel = (frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => {
+    emits('dragCancel', frames, frameData, event);
+    console.log('Drag cancelled:', frames, frameData);
 };
+const handleOnDrop = (_frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => {
+    emits('drop', _frames, frameData, event);
+    console.log('Dropped:', _frames, frameData);
 
-const handleOnDragCancel = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-    emits('dragCancel', frame, frameData, event);
-};
-
-const handleOnDrop = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-    emits('drop', frame, frameData, event);
-
-    // frameData.current is an array — one entry per frame in the group (or just
-    // the primary for a non-grouped drag). Update every frame so group members
-    // are persisted alongside the primary.
+    // `frameData.current` carries one entry per dragged frame (primary first).
+    // Persist every entry so all selected frames move together.
     frameData.current.forEach(item => {
         const original = timeline?.state.sectionFramesByUuid[item.uuid];
         if (!original) return;
@@ -90,14 +66,12 @@ const handleOnDrop = (frame: TimelineFrameByUuidInterface, frameData: DraggedFra
             end_ms: item.end_ms,
             rowUuid: item.rowUuid ?? original.rowUuid,
             sectionUuid: item.sectionUuid ?? original.sectionUuid,
-            linkGroupUuid: original.linkGroupUuid, // preserve link group on drag
+            linkGroupUuid: original.linkGroupUuid,
         });
     });
 };
 
-
 watch(activeHandler, (newHandler, oldHandler) => {
-
     oldHandler?.removeEvent('dragStart', 'activeHandlerOnDragStart');
     oldHandler?.removeEvent('dragEnd', 'activeHandlerOnDragEnd');
     oldHandler?.removeEvent('dragCancel', 'activeHandlerOnDragCancel');
@@ -107,20 +81,25 @@ watch(activeHandler, (newHandler, oldHandler) => {
     newHandler?.onDragEnd(handleOnDragEnd, 'activeHandlerOnDragEnd');
     newHandler?.onDragCancel(handleOnDragCancel, 'activeHandlerOnDragCancel');
     newHandler?.onDrop(handleOnDrop, 'activeHandlerOnDrop');
-}, { immediate: true })
+}, { immediate: true });
 
 onUnmounted(() => {
     features?.destroyFeature('dnd');
-})
+});
 
+// Visual link flags for ghost entries — delegated to JoinRows when present
+// so multi-frame visual logic stays in its proper home.
+const ghostLinkFlags = (uuid: string | number) => {
+    const jr = features?.data.joinRows;
+    if (!jr || !dnd.value) return { linkedAbove: false, linkedBelow: false };
+    return jr.getGhostLinkFlags(uuid, dnd.value.state.draggingPlaceholders);
+};
 </script>
 
 <template>
-
     <!--
-        Ghost previews.
-        Loop over draggingPlaceholders — always contains the primary frame while
-        dragging; external features (e.g. JoinRows) add group-member entries.
+        Ghost previews. dnd.state.draggingPlaceholders contains one entry
+        per selected frame (primary first); we render them all.
     -->
     <Teleport to="#editorAreaTeleports" defer>
         <div
@@ -144,15 +123,14 @@ onUnmounted(() => {
                 :left="0"
                 :width="entry.width"
                 :selected="true"
-                :linked-above="getGhostLinkFlags(entry).linkedAbove"
-                :linked-below="getGhostLinkFlags(entry).linkedBelow"
+                :linked-above="ghostLinkFlags(entry.uuid).linkedAbove"
+                :linked-below="ghostLinkFlags(entry.uuid).linkedBelow"
             />
         </div>
 
         <!--
-            Drop-target highlighters.
-            Validated snapped positions from activeHandler (snapping when active,
-            dnd otherwise). Primary entry gets the user-replaceable highlighter slot.
+            Drop-target highlighters — validated snapped positions from
+            activeHandler. Primary entry gets the user-replaceable slot.
         -->
         <div
             v-for="entry in Object.values(activeHandler?.state.draggingPlaceholders ?? {})"
@@ -186,6 +164,4 @@ onUnmounted(() => {
             </template>
         </div>
     </Teleport>
-
-    
 </template>

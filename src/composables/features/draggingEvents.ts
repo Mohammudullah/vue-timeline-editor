@@ -1,74 +1,86 @@
 import { TimelineFrameByUuidInterface } from "../../types/timeline";
 
+/**
+ * useDraggingEvents
+ *
+ * Tiny pub/sub for drag and resize lifecycle events. Each handler receives
+ * the FULL set of frames participating in the operation (primary first),
+ * so consumers don't need to look up "the other selected frames" themselves.
+ *
+ * For drag/resize end + cancel + drop + resized, a `frameData` object is
+ * also delivered with `initial` and `current` per-frame snapshots.
+ */
 export const useDraggingEvents = () => {
 
+    type DragLifecycleHandler = (frames: TimelineFrameByUuidInterface[], event: PointerEvent) => void;
+    type DragDataHandler = (frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => void;
+    type ResizeLifecycleHandler = (frames: TimelineFrameByUuidInterface[], event: PointerEvent) => void;
+    type ResizeDataHandler = (frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent) => void;
+
     const events = {
-        'dragStart': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, event: PointerEvent) => void }[],
-        'dragEnd': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void }[],
-        'dragCancel': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void }[],
-        'drop': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void }[],
+        'dragStart':    [] as { id: string, handler: DragLifecycleHandler }[],
+        'dragEnd':      [] as { id: string, handler: DragDataHandler }[],
+        'dragCancel':   [] as { id: string, handler: DragDataHandler }[],
+        'drop':         [] as { id: string, handler: DragDataHandler }[],
 
-        'resizeStart': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, event: PointerEvent) => void }[],
-        'resizeEnd': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => void }[],
-        'resized': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => void }[],
-        'resizeCancel': [] as { id: string, handler: (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => void }[],
-    }
+        'resizeStart':  [] as { id: string, handler: ResizeLifecycleHandler }[],
+        'resizeEnd':    [] as { id: string, handler: ResizeDataHandler }[],
+        'resized':      [] as { id: string, handler: ResizeDataHandler }[],
+        'resizeCancel': [] as { id: string, handler: ResizeDataHandler }[],
+    };
 
-    const registerEvent = (type: keyof typeof events, handler: ((frame?: TimelineFrameByUuidInterface, frameData?: DraggedFrameDataInterface, event?: PointerEvent) => void), id: string) => {
-
+    const registerEvent = (type: keyof typeof events, handler: any, id: string) => {
         if (events[type]) {
-            events[type].push({ id, handler } as any);
+            (events[type] as any[]).push({ id, handler });
         }
-    }
+    };
 
     const removeEvent = (type: keyof typeof events, id: string) => {
         if (events[type]) {
-            events[type] = events[type].filter(event => event.id !== id) as any;
+            events[type] = (events[type] as any[]).filter(e => e.id !== id) as any;
         }
-    }
+    };
 
-    const triggerOnDragStart = (frame: TimelineFrameByUuidInterface, event: PointerEvent) => {
-        events['dragStart'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), event));
-    }
+    const cloneFrames = (frames: TimelineFrameByUuidInterface[]) =>
+        JSON.parse(JSON.stringify(frames)) as TimelineFrameByUuidInterface[];
 
-    const triggerOnDragEnd = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-        events['dragEnd'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
-    }
+    const cloneData = <T>(data: T): T => JSON.parse(JSON.stringify(data));
 
-    const triggerOnDragCancel = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-        events['dragCancel'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
-    }
+    const triggerOnDragStart = (frames: TimelineFrameByUuidInterface[], event: PointerEvent) => {
+        events.dragStart.forEach(h => h.handler(cloneFrames(frames), event));
+    };
+    const triggerOnDragEnd = (frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => {
+        events.dragEnd.forEach(h => h.handler(cloneFrames(frames), cloneData(frameData), event));
+    };
+    const triggerOnDragCancel = (frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => {
+        events.dragCancel.forEach(h => h.handler(cloneFrames(frames), cloneData(frameData), event));
+    };
+    const triggerOnDrop = (frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => {
+        events.drop.forEach(h => h.handler(cloneFrames(frames), cloneData(frameData), event));
+    };
 
-    const triggerOnDrop = (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-        events['drop'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
-    }
+    const triggerOnResizeStart = (frames: TimelineFrameByUuidInterface[], event: PointerEvent) => {
+        events.resizeStart.forEach(h => h.handler(cloneFrames(frames), event));
+    };
+    const triggerOnResizeEnd = (frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent) => {
+        events.resizeEnd.forEach(h => h.handler(cloneFrames(frames), cloneData(frameData), event));
+    };
+    const triggerOnResized = (frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent) => {
+        events.resized.forEach(h => h.handler(cloneFrames(frames), cloneData(frameData), event));
+    };
+    const triggerOnResizeCancel = (frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent) => {
+        events.resizeCancel.forEach(h => h.handler(cloneFrames(frames), cloneData(frameData), event));
+    };
 
-    const triggerOnResizeStart = (frame: TimelineFrameByUuidInterface, event: PointerEvent) => {
-        events['resizeStart'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), event));
-    }
+    const onDragStart  = (handler: DragLifecycleHandler, id: string) => registerEvent('dragStart',  handler, id);
+    const onDragEnd    = (handler: DragDataHandler,      id: string) => registerEvent('dragEnd',    handler, id);
+    const onDragCancel = (handler: DragDataHandler,      id: string) => registerEvent('dragCancel', handler, id);
+    const onDrop       = (handler: DragDataHandler,      id: string) => registerEvent('drop',       handler, id);
 
-    const triggerOnResizeEnd = (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => {
-        events['resizeEnd'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
-    }
-    
-    const triggerOnResized = (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => {
-        events['resized'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
-    }
-
-    const triggerOnResizeCancel = (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => {
-        events['resizeCancel'].forEach(handler => handler.handler(JSON.parse(JSON.stringify(frame)), JSON.parse(JSON.stringify(frameData)), event));
-    }
-
-    const onDragStart = (handler: (frame: TimelineFrameByUuidInterface, event: PointerEvent) => void, id: string) => registerEvent('dragStart', handler as any, id);
-    const onDragEnd = (handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void, id: string) => registerEvent('dragEnd', handler as any, id);
-    const onDragCancel = (handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void, id: string) => registerEvent('dragCancel', handler as any, id);
-    const onDrop = (handler: (frame: TimelineFrameByUuidInterface, frameData: DraggedFrameDataInterface, event: PointerEvent) => void, id: string) => registerEvent('drop', handler as any, id);
-
-    const onResizeStart = (handler: (frame: TimelineFrameByUuidInterface, event: PointerEvent) => void, id: string) => registerEvent('resizeStart', handler as any, id);
-    const onResizeEnd = (handler: (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => void, id: string) => registerEvent('resizeEnd', handler as any, id);
-    const onResized = (handler: (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => void, id: string) => registerEvent('resized', handler as any, id);
-    const onResizeCancel = (handler: (frame: TimelineFrameByUuidInterface, frameData: ResizedFrameDataInterface, event: PointerEvent) => void, id: string) => registerEvent('resizeCancel', handler as any, id);
-
+    const onResizeStart  = (handler: ResizeLifecycleHandler, id: string) => registerEvent('resizeStart',  handler, id);
+    const onResizeEnd    = (handler: ResizeDataHandler,      id: string) => registerEvent('resizeEnd',    handler, id);
+    const onResized      = (handler: ResizeDataHandler,      id: string) => registerEvent('resized',      handler, id);
+    const onResizeCancel = (handler: ResizeDataHandler,      id: string) => registerEvent('resizeCancel', handler, id);
 
     return {
         onDragStart,
@@ -89,11 +101,15 @@ export const useDraggingEvents = () => {
         triggerOnResized,
         triggerOnResizeCancel,
 
-        removeEvent
-    }
-}
+        removeEvent,
+    };
+};
 
 
+/**
+ * One per-frame snapshot in a drag/resize event. `initial` mirrors
+ * pre-interaction state; `current` mirrors the latest validated state.
+ */
 export interface FrameDataItem {
     uuid: string | number,
     sectionUuid: string | number | null,
