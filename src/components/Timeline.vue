@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, provide, ref } from 'vue';
+import { onBeforeUnmount, onMounted, provide, ref } from 'vue';
 import { useTimeline, UseTimelineInterface } from '../composables/timeline';
 import { TimelineRangeArgInterface } from '../types/timeline';
 import { TimelineConfigInterface, useTimelineConfig } from '../composables/timelineConfig';
@@ -15,13 +15,13 @@ import { useFeatures } from '../composables/features/features';
 
 const props = withDefaults(defineProps<{
     initialRange?: TimelineRangeArgInterface,
-    timeAxisTimeFormat?: TimeStringTimeFormatOptions
+    timeAxisTimeFormat?: TimeStringTimeFormatOptions,
 }>(), {
     initialRange: () => ({
         start_seconds: 0, //start at 12:00 am
         end_seconds: 24 * 60 * 60 //end at 11:59 pm
     }),
-    timeAxisTimeFormat: 'HH:mm:ss'
+    timeAxisTimeFormat: 'HH:mm:ss',
 })
 
 const emits = defineEmits<{
@@ -29,7 +29,9 @@ const emits = defineEmits<{
     'scroll': [value: Event]
 }>() 
 
-const timelineContainer = ref<HTMLDivElement | null>(null)
+const timelineContainer = ref<HTMLDivElement | null>(null);
+const timelineContainerParent = ref<HTMLDivElement | null>(null);
+
 const timelineEditor = ref<HTMLDivElement | null>(null);
 const scrollPaneEl = ref<HTMLDivElement | null>(null);
 const scrollLeft = ref(0);
@@ -71,7 +73,16 @@ const onTimelineScroll = (event: Event) => {
     emits('scroll', event)
 }
 
+
+const setContainerHeight = () => {
+    timelineConfig.container.height = timelineContainerParent.value?.clientHeight ?? timelineConfig.container.height;
+}
+
 onMounted(() => {
+    setContainerHeight();
+
+    timelineContainerParent.value?.addEventListener('resize', setContainerHeight);
+
     emits('init', {
         config: timelineConfig,
         timeline: timeline,
@@ -79,129 +90,95 @@ onMounted(() => {
     })
 })
 
+onBeforeUnmount(() => {
+    timelineContainerParent.value?.removeEventListener('resize', setContainerHeight);
+})
+
 </script>
 <template>
-    <div 
-        class="vtd__timeline-container vtd"
-        @contextmenu.prevent
-        :style="{
-            height: timelineConfig.container.height + 'px'
-        }" 
-        ref="timelineContainer"
-    
-    >
-
-        <div class="vtd__timeline-header">
-            <div
-                class="vtd__timeline-header-spacer"
-                :style="{
-                    width: timelineConfig.rows.labelWidth + 'px',
-                    height: timelineConfig.cols.labelHeight + 'px'
-                }"
-            />
-
-            <div class="vtd__timeline-header-main">
-                <XAxis
-                    :config="timelineConfig"
-                    :timeline="timeline"
-                    :style="{
-                        transform: `translateX(${-scrollLeft}px)`
-                    }"
-                />
-            </div>
-        </div>
-
-        <div
-            class="vtd__timeline-body"
+    <div ref="timelineContainerParent" style="height: 100%;">
+        <div 
+            class="vtd__timeline-container vtd"
+            @contextmenu.prevent
             :style="{
-                height: `calc(100% - ${timelineConfig.cols.labelHeight}px)`
-            }"
+                height: timelineConfig.container.height + 'px'
+            }" 
+            ref="timelineContainer"
+        
         >
-            <div class="vtd__timeline-y-axis-pane">
-                <YAxis
-                    :config="timelineConfig"
-                    :timeline="timeline"
+
+            <div class="vtd__timeline-header">
+                <div
+                    class="vtd__timeline-header-spacer"
                     :style="{
-                        transform: `translateY(${-scrollTop}px)`
+                        width: timelineConfig.rows.labelWidth + 'px',
+                        height: timelineConfig.cols.labelHeight + 'px'
                     }"
                 />
+
+                <div class="vtd__timeline-header-main">
+                    <XAxis
+                        :config="timelineConfig"
+                        :timeline="timeline"
+                        :style="{
+                            transform: `translateX(${-scrollLeft}px)`
+                        }"
+                    />
+                </div>
             </div>
 
             <div
-                class="vtd__wrapper"
-                @scroll="onTimelineScroll"
-                ref="scrollPaneEl"
+                class="vtd__timeline-body"
+                :style="{
+                    height: `calc(100% - ${timelineConfig.cols.labelHeight}px)`
+                }"
             >
+                <div class="vtd__timeline-y-axis-pane">
+                    <YAxis
+                        :config="timelineConfig"
+                        :timeline="timeline"
+                        :style="{
+                            transform: `translateY(${-scrollTop}px)`
+                        }"
+                    />
+                </div>
+
                 <div
-                    class="vtd__timeline-editor-area"
-                    ref="timelineEditor"
-                    :style="{
-                        width: timelineConfig.editor.width + 'px',
-                    }"
+                    class="vtd__wrapper"
+                    @scroll="onTimelineScroll"
+                    ref="scrollPaneEl"
                 >
-
-                    <div id="editorBackgroundTeleports" class="vtd__editor-background-teleports"></div>
-
-                    <div 
-                        class="vtd__timeline-sections"
+                    <div
+                        class="vtd__timeline-editor-area"
+                        ref="timelineEditor"
+                        :style="{
+                            width: timelineConfig.editor.width + 'px',
+                        }"
                     >
-                        <Section
-                            v-for="uuid in timeline.state.sectionUuids"
-                            :key="uuid"
-                            :uuid="uuid"
-                            :config="timelineConfig"
-                            :timeline="timeline"
-                            :features="features"
-                        />
-                    </div>
 
-                    <div id="editorAreaTeleports"></div>
+                        <div id="editorBackgroundTeleports" class="vtd__editor-background-teleports"></div>
+
+                        <div 
+                            class="vtd__timeline-sections"
+                        >
+                            <Section
+                                v-for="uuid in timeline.state.sectionUuids"
+                                :key="uuid"
+                                :uuid="uuid"
+                                :config="timelineConfig"
+                                :timeline="timeline"
+                                :features="features"
+                            />
+                        </div>
+
+                        <div id="editorAreaTeleports"></div>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <div class="vtd">
+            <slot></slot>
+        </div>
     </div>
-
-    <div class="vtd">
-        <slot></slot>
-    </div>
-
-     <pre>
-
-        <!-- {{ features.data.dnd?.state.draggingPlaceholder }}
-        {{ features.data.snapping?.state.draggingPlaceholder }} -->
-     </pre>
-    <!--<br/>
-    <pre>
-        {{ features.data.frames.state.primary }}
-    </pre>
-
-    <pre>
-        {{ timeline.state.sectionRowsMeta }}
-    </pre> -->
-
-    <!-- <button
-        @click="() => timeline.updateFrame('frame10', {
-            uuid: 'frame10',
-            title: 'Frame 11',
-            start_ms: 10 * 60 * 60 * 1000,
-            end_ms: 12 * 60 * 60 * 1000
-        })"
-    >
-        Update Frame 10
-    </button>
-    <br>
-    <button
-        @click="() => timeline.updateRow('row10', {
-            uuid: 'row10',
-            title: 'Row 11',
-        })"
-    >
-        Update Row 10
-    </button> -->
-
-    <!-- <Test
-        v-for="section in timeline.state.sections"
-        :key="section.uuid"
-        :section="section"
-    /> -->
 </template>

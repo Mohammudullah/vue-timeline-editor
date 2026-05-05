@@ -9,7 +9,7 @@ export const useTimelineConfig = (
         scrollPaneEl,
         direction = 'horizontal',
         zoom = 1,
-        colsLabelHeight = 60,
+        colsLabelHeight = 40,
         rowsLabelWidth = 100,
         timeAxisTimeFormat,
         initialRange,
@@ -89,7 +89,7 @@ export const useTimelineConfig = (
         if (timelineContainer.value) {
             data.container = {
                 width: timelineContainer.value.clientWidth,
-                height: 500,
+                height: data.container.height, // keep height from props
             }  
         }
     }
