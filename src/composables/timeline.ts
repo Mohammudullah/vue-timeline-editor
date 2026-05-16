@@ -154,7 +154,18 @@ export const useTimeline = (
 
     const initSections = (sections: TimelineSectionInterface[]) => {
 
-
+        //clear existing data
+        state.sectionUuids = [];
+        state.sectionRowUuids = {};
+        state.sectionFrameUuids = {};
+        state.sectionRowsByUuid = {};
+        state.sectionFramesByUuid = {};
+        state.sectionsByUuid = {};
+        rowsCenterCache.length = 0;
+        state.sectionsCount = 0;
+        state.rowsCount = 0;
+        state.framesCount = 0;
+        
 
         sections.forEach((section, index) => {
 

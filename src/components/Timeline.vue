@@ -24,8 +24,14 @@ const props = withDefaults(defineProps<{
     timeAxisTimeFormat: 'HH:mm:ss',
 })
 
+export interface TimelineInitInterface {
+    config: TimelineConfigInterface;
+    timeline: UseTimelineInterface;
+    container: HTMLDivElement | null;
+}
+
 const emits = defineEmits<{
-    'init': [value: { config: TimelineConfigInterface, timeline: UseTimelineInterface, container: HTMLDivElement | null }],
+    'init': [value: TimelineInitInterface],
     'scroll': [value: Event]
 }>() 
 
@@ -93,6 +99,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
     timelineContainerParent.value?.removeEventListener('resize', setContainerHeight);
 })
+
+
 
 </script>
 <template>
