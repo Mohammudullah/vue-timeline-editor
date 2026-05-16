@@ -40,6 +40,31 @@ watch(container, (newContainer) => {
     emits('containerUpdate', newContainer);
 })
 
+// Matches DRAG_THRESHOLD in dnd.ts so click-vs-drag is consistent across features.
+const CLICK_THRESHOLD = 4;
+let pressOrigin: { x: number, y: number } | null = null;
+let pressMoved = false;
+
+const onPointerDown = (event: PointerEvent) => {
+    pressOrigin = { x: event.clientX, y: event.clientY };
+    pressMoved = false;
+};
+
+const onPointerMove = (event: PointerEvent) => {
+    if (!pressOrigin || pressMoved) return;
+    const dx = Math.abs(event.clientX - pressOrigin.x);
+    const dy = Math.abs(event.clientY - pressOrigin.y);
+    if (dx > CLICK_THRESHOLD || dy > CLICK_THRESHOLD) pressMoved = true;
+};
+
+const onClick = (event: PointerEvent) => {
+    const moved = pressMoved;
+    pressOrigin = null;
+    pressMoved = false;
+    if (moved) return;
+    emits('click', event);
+};
+
 
 </script>
 
@@ -73,7 +98,9 @@ watch(container, (newContainer) => {
                 'vtd__row-frame--linked-below': linkedBelow,
             }"
             style="overflow: hidden;"
-            @click="emits('click', $event)"
+            @pointerdown="onPointerDown"
+            @pointermove="onPointerMove"
+            @click="onClick"
         >
             <div class="vtd__row-frame-title">
                 {{ title }}
