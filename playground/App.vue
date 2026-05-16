@@ -6,6 +6,7 @@ import SnapGuideLines from '../src/components/Features/SnapGuideLines.vue';
 import Snapping from '../src/components/Features/Snapping.vue';
 import Timeline from '../src/components/Timeline.vue';
 import JoinRows from '../src/components/Features/JoinRows.vue';
+import PanScroll from '../src/components/Features/PanScroll.vue';
 import '../src/styles/basic-theme.css';
 
 </script>
@@ -254,6 +255,7 @@ import '../src/styles/basic-theme.css';
             <Resize/>
             <SnapGuideLines/>
             <JoinRows/>
+            <PanScroll/>
         </Timeline>
     </div>
 </template>

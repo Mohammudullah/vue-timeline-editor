@@ -7,6 +7,7 @@ import { TimelineConfigInterface } from "../timelineConfig";
 import { UseResizeInterface } from "./resize";
 import { UseSnapGuideLinesType } from "./snapGuideLines";
 import { UseJoinRowsType } from "./joinRows";
+import { UsePanScrollType } from "./panScroll";
 
 /**
  * useFeatures
@@ -32,6 +33,7 @@ export const useFeatures = ({
         resize: null,
         snapGuideLines: null,
         joinRows: null,
+        panScroll: null,
         frames,
     });
 
@@ -45,6 +47,7 @@ export const useFeatures = ({
         else if (feature === 'resize') features.resize = value() as UseResizeInterface;
         else if (feature === 'snapGuideLines') features.snapGuideLines = value() as UseSnapGuideLinesType;
         else if (feature === 'joinRows') features.joinRows = value() as UseJoinRowsType;
+        else if (feature === 'panScroll') features.panScroll = value() as UsePanScrollType;
     };
 
     const destroyFeature = (feature: keyof FeaturesInterface): void => {
@@ -55,6 +58,7 @@ export const useFeatures = ({
         else if (feature === 'resize') features.resize = null;
         else if (feature === 'snapGuideLines') features.snapGuideLines = null;
         else if (feature === 'joinRows') features.joinRows = null;
+        else if (feature === 'panScroll') features.panScroll = null;
     };
 
     return {
@@ -71,8 +75,9 @@ export interface FeaturesInterface {
     resize: UseResizeInterface | null,
     snapGuideLines: UseSnapGuideLinesType | null,
     joinRows: UseJoinRowsType | null,
+    panScroll: UsePanScrollType | null,
 }
 
 export type UseFeaturesType = ReturnType<typeof useFeatures>;
 
-export type InitFeatureType = UseDndType | UseSnappingInterface | UseFramesType | UseResizeInterface | UseSnapGuideLinesType | UseJoinRowsType;
+export type InitFeatureType = UseDndType | UseSnappingInterface | UseFramesType | UseResizeInterface | UseSnapGuideLinesType | UseJoinRowsType | UsePanScrollType;
