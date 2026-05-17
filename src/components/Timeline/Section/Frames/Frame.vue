@@ -74,6 +74,13 @@ const hasLinkedBelow = computed(() => {
     );
 });
 
+// True while `timeline.scrollToViewPort(uuid, true)` is animating this
+// frame's blink — the timeline composable manages the timing and clears the
+// flag automatically. Just a reactive pass-through here.
+const isHighlighted = computed(() =>
+    props.timeline.state.highlightedFrameUuids[props.uuid] === true
+);
+
 // True when another frame in the SAME row shares any part of this frame's
 // time range. Surfaces the overlap state to the UI so a stacked frame can
 // render semi-transparent and not visually swallow what's underneath.
@@ -114,6 +121,7 @@ const isOverlapping = computed(() => {
         :linked-above="hasLinkedAbove"
         :linked-below="hasLinkedBelow"
         :overlapping="isOverlapping"
+        :highlighted="isHighlighted"
     >
         <!-- Re-expose the `frame` slot to consumers further up the tree. -->
         <template #frame="slotProps">

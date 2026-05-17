@@ -167,6 +167,19 @@
     border-style: dashed;
 }
 
+/* Triggered by timeline.scrollToViewPort(uuid, true). Blinks the border
+   three times over the same 1500ms window the composable holds the class
+   on. Tune colour/duration here; the composable just toggles the class. */
+@keyframes vtd-highlight-blink {
+    0%, 50%, 100% { border-color: rgb(0, 120, 215); }
+    25%, 75%      { border-color: rgba(0, 120, 215, 0.15); }
+}
+
+.vtd__row-frame--highlight-blink {
+    border-color: rgb(0, 120, 215);
+    animation: vtd-highlight-blink 1.5s ease-in-out;
+}
+
 /* When selected, the frame foregrounds and forces full opacity so its
    text stays readable even on top of an overlapping sibling. The z-index
    has to live on the positioned container (the inner .vtd__row-frame is

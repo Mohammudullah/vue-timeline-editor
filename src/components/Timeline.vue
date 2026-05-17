@@ -10,7 +10,7 @@ import '../styles/style.css';
 import { TimeStringTimeFormatOptions } from '../composables/utils';
 import YAxis from './Timeline/Axis/YAxis.vue';
 import Section from './Timeline/Section/Section.vue';
-import { useFeatures } from '../composables/features/features';
+import { useFeatures, UseFeaturesType } from '../composables/features/features';
 
 
 const props = withDefaults(defineProps<{
@@ -28,6 +28,12 @@ export interface TimelineInitInterface {
     config: TimelineConfigInterface;
     timeline: UseTimelineInterface;
     container: HTMLDivElement | null;
+    // Feature registry — exposes selection API (`features.data.frames`),
+    // dnd, resize, snapping, and any other feature composable that's been
+    // initialised by a mounted feature component. Use this from App.vue to
+    // call methods like `features.data.frames.selectFrame(...)` or read
+    // `features.data.frames.state.selectedUuids`.
+    features: UseFeaturesType;
 }
 
 const emits = defineEmits<{
@@ -97,7 +103,8 @@ onMounted(() => {
     emits('init', {
         config: timelineConfig,
         timeline: timeline,
-        container: timelineContainer.value
+        container: timelineContainer.value,
+        features: features,
     })
 })
 

@@ -17,6 +17,11 @@ export interface TimelineInterface {
     sectionsCount: number,
     rowsCount: number,
     framesCount: number,
+    // Uuids currently flagged for the highlight-blink animation by
+    // `scrollToViewPort(uuid, true)`. Cleared automatically when the
+    // animation duration expires. Frame.vue reads this and forwards it to
+    // FrameUI as a class trigger.
+    highlightedFrameUuids: Record<string | number, true>,
     pointer: {
         clientX: number,
         clientY: number,
@@ -53,13 +58,14 @@ export const useTimeline = (
         container: null,
         editor: null,
         scrollPaneEl: null,
-        sectionRowsByUuid: {}, 
+        sectionRowsByUuid: {},
         sectionFramesByUuid: {},
         sectionsByUuid: {},
 
         sectionsCount: 0,
         rowsCount: 0,
         framesCount: 0,
+        highlightedFrameUuids: {},
 
         sectionUuids: [],
         sectionRowUuids: {},
@@ -405,6 +411,58 @@ export const useTimeline = (
     }
 
 
+    // Per-uuid timeout handles so repeated calls reset the blink window
+    // instead of stacking (otherwise the class would clear prematurely if a
+    // second call followed a first by less than the animation duration).
+    const highlightTimers: Record<string | number, ReturnType<typeof setTimeout>> = {};
+    const HIGHLIGHT_DURATION_MS = 1500;
+
+    /**
+     * Smooth-scrolls the scroll pane so the given frame is in view (aligned
+     * to the left side of the viewport with a small leading margin). When
+     * `highlight` is true, also flags the frame for the blink animation —
+     * the class is applied via timeline state and cleared automatically when
+     * the animation completes.
+     *
+     * When the targeted frame has a `linkGroupUuid`, every frame sharing the
+     * group is highlighted together so a joined booking blinks as one unit
+     * regardless of which member uuid was passed in.
+     */
+    const scrollToViewPort = (uuid: string | number, highlight = false) => {
+        const frame = state.sectionFramesByUuid[uuid];
+        const pane = state.scrollPaneEl;
+        if (!frame || !pane) return;
+
+        const viewportWidth = pane.clientWidth;
+        // Leave ~20% of the viewport as leading space so the frame doesn't
+        // sit flush against the left edge. Clamp at 0 so very-early frames
+        // don't try to scroll negative.
+        const targetLeft = Math.max(0, frame.editorRelativeLeft - viewportWidth * 0.2);
+        pane.scrollTo({ left: targetLeft, behavior: 'smooth' });
+
+        if (highlight) {
+            // Collect every uuid that should blink: the target itself plus
+            // any joined siblings. When there's no linkGroup, this is just
+            // the single uuid.
+            const groupUuid = frame.linkGroupUuid;
+            const uuidsToHighlight: (string | number)[] = groupUuid != null
+                ? Object.values(state.sectionFramesByUuid)
+                    .filter(f => f.linkGroupUuid === groupUuid)
+                    .map(f => f.uuid)
+                : [uuid];
+
+            for (const u of uuidsToHighlight) {
+                if (highlightTimers[u]) clearTimeout(highlightTimers[u]);
+                state.highlightedFrameUuids[u] = true;
+                highlightTimers[u] = setTimeout(() => {
+                    delete state.highlightedFrameUuids[u];
+                    delete highlightTimers[u];
+                }, HIGHLIGHT_DURATION_MS);
+            }
+        }
+    }
+
+
     watch([container, editor, scrollPaneEl], ([newContainer, newEditor, newScrollPaneEl]) => {
         state.container = newContainer;
         state.editor = newEditor;
@@ -429,7 +487,7 @@ export const useTimeline = (
         updateRow,
         enableEdgeScrolling,
         disableEdgeScrolling,
-
+        scrollToViewPort,
     };
 }
 

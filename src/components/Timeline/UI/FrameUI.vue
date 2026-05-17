@@ -24,6 +24,9 @@ const props = withDefaults(defineProps<{
     // row. Triggers a semi-transparent style so the stacked frames are both
     // visible. Used when overlap protection is disabled.
     overlapping?: boolean,
+    // True while a `scrollToViewPort(uuid, true)` blink is active. Applies a
+    // class that the theme animates; cleared automatically by the composable.
+    highlighted?: boolean,
 }>(), {
 
 })
@@ -106,6 +109,7 @@ const onClick = (event: PointerEvent) => {
                 'vtd__row-frame--linked-above': linkedAbove,
                 'vtd__row-frame--linked-below': linkedBelow,
                 'vtd__row-frame--overlapping': overlapping,
+                'vtd__row-frame--highlight-blink': highlighted,
             }"
             style="overflow: hidden;"
             @pointerdown="onPointerDown"
