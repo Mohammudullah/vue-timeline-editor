@@ -83,6 +83,10 @@ export const useSnapping = ({
 
 
     const calculateRowsCenterCache = () => {
+        // Rebuild from scratch — otherwise repeated drags accumulate stale
+        // entries (the array is module-scoped to this composable and only
+        // ever appended to here).
+        rowsCache.length = 0;
         Object.values(timeline.state.sectionRowsByUuid).forEach((row) => {
             const top = row.editorRelativeTop;
             rowsCache.push({
@@ -92,6 +96,93 @@ export const useSnapping = ({
             });
         });
     }
+
+
+    // Resolves the row a drag should target.
+    //
+    // Preference order:
+    //   1. The pointer's row, when the pointer itself isn't sitting on top of
+    //      a blocking frame in that row. protectOverLappingFrames handles
+    //      horizontal snap-to-edge within the row in this case.
+    //   2. The row whose `editorRelativeTop` is closest to the pointer Y AND
+    //      has space at the drag's freeform [start_ms, end_ms]. This is what
+    //      makes the placeholder hop to an adjacent free row when the cursor
+    //      is dragged over a blocker (or into the gap above/below the rows).
+    //   3. The closest row by Y as a last resort — even if blocked — so
+    //      downstream snap logic operates on a fresh cache instead of the
+    //      previously-visited row's stale state.
+    //
+    // `frameStartMs`/`frameEndMs`/`excludeUuid` are optional; without them
+    // the availability check is skipped and the function reduces to "pointer's
+    // row, else closest by Y".
+    const resolveDragRow = (
+        frameStartMs?: number,
+        frameEndMs?: number,
+        excludeUuid?: string | number,
+    ): { rowUuid: string | number | null, top: number | null } => {
+        const pointerY = timeline.state.pointer.editorRelativeY;
+        const pointerOnMs = timeline.state.pointer.on_ms;
+        const pointerRowUuid = timeline.state.pointer.over.rowUuid ?? null;
+
+        // True iff the pointer is currently inside (horizontally) some frame
+        // in `rowUuid`. This is the precise condition under which
+        // protectOverLappingFrames refuses to advance the placeholder.
+        const pointerOnBlockerIn = (rowUuid: string | number): boolean => {
+            if (pointerOnMs == null || excludeUuid == null) return false;
+            const all = timeline.state.sectionFramesByUuid;
+            for (const key in all) {
+                const f = all[key];
+                if (f.rowUuid !== rowUuid || f.uuid === excludeUuid) continue;
+                if (pointerOnMs >= f.start_ms && pointerOnMs <= f.end_ms) return true;
+            }
+            return false;
+        };
+
+        const canFitInRow = (rowUuid: string | number): boolean => {
+            if (frameStartMs == null || frameEndMs == null || excludeUuid == null) return true;
+            return !wouldOverlapInRow(rowUuid, frameStartMs, frameEndMs, excludeUuid);
+        };
+
+        const rowTop = (rowUuid: string | number): number | null =>
+            timeline.state.sectionRowsByUuid[rowUuid]?.editorRelativeTop ?? null;
+
+        // 1. Pointer over a row, and not on a blocker → stay.
+        if (pointerRowUuid && !pointerOnBlockerIn(pointerRowUuid)) {
+            return { rowUuid: pointerRowUuid, top: rowTop(pointerRowUuid) };
+        }
+
+        if (pointerY == null || rowsCache.length === 0) {
+            return pointerRowUuid
+                ? { rowUuid: pointerRowUuid, top: rowTop(pointerRowUuid) }
+                : { rowUuid: null, top: pointerY ?? null };
+        }
+
+        // 2. Pointer on a blocker (or off the rows): pick the closest row by
+        // Y that has space for the frame's freeform times.
+        const sortedByDistance = [...rowsCache].sort((a, b) =>
+            Math.abs(a.top - pointerY) - Math.abs(b.top - pointerY)
+        );
+
+        for (const row of sortedByDistance) {
+            if (canFitInRow(row.rowUuid)) {
+                return { rowUuid: row.rowUuid, top: row.top };
+            }
+        }
+
+        // 3. No row has space — fall back to the closest one.
+        const closest = sortedByDistance[0];
+        return { rowUuid: closest.rowUuid, top: closest.top };
+    }
+
+
+    // Cached row resolution for the current drag tick. snapOnDragPipeline
+    // computes it once (with availability info) and snapRows reads it so the
+    // placeholder top, the active-row cache, and the placeholder's rowUuid
+    // all agree.
+    let currentDragRowResolution: { rowUuid: string | number | null, top: number | null } = {
+        rowUuid: null,
+        top: null,
+    };
 
 
     const setFrameOverRow = (frameTop: number) => {
@@ -218,22 +309,8 @@ export const useSnapping = ({
 
     const snapRows = (dependency: SnapDependencyInterface, top: number | null, left: number | null, startMs: number | null, endMs: number | null) => {
 
-        const editorRelativeY = timeline.state.pointer.editorRelativeY ?? 0;
-        const pointerOverRow = timeline.state.pointer.over.rowUuid ?? null;
-
-        if(!pointerOverRow) {
-            return {
-                top: editorRelativeY,
-                left,
-                startMs,
-                endMs,
-            }
-        }
-
-        const row = timeline.state.sectionRowsByUuid[pointerOverRow];
-
         return {
-            top: row ? row.editorRelativeTop : editorRelativeY,
+            top: currentDragRowResolution.top ?? timeline.state.pointer.editorRelativeY ?? 0,
             left,
             startMs,
             endMs,
@@ -761,7 +838,31 @@ export const useSnapping = ({
     const snapOnDragPipeline = () => {
         if(!dnd.value || !dnd.value.state.dragging) return;
 
-        const currentRowUuid = timeline.state.pointer.over.rowUuid;
+        const primaryUuid = dnd.value.state.draggingFrame.uuid;
+        if (primaryUuid == null) return;
+        const freeformPrimary = dnd.value.state.draggingPlaceholders[primaryUuid];
+        if (!freeformPrimary) return;
+
+        // Decide which row this tick targets. When rowLocked (JoinRows) the
+        // original row always wins. Otherwise resolveDragRow can hop to the
+        // closest free row when the pointer sits on a blocking frame —
+        // without this, protectOverLappingFrames would freeze the placeholder
+        // at its last valid horizontal position.
+        const rowLocked = dnd.value.state.rowLocked;
+        const lockedRowUuid = rowLocked ? dnd.value.state.draggingFrame.data?.rowUuid ?? null : null;
+        if (lockedRowUuid) {
+            currentDragRowResolution = {
+                rowUuid: lockedRowUuid,
+                top: timeline.state.sectionRowsByUuid[lockedRowUuid]?.editorRelativeTop ?? null,
+            };
+        } else {
+            currentDragRowResolution = resolveDragRow(
+                freeformPrimary.start_ms,
+                freeformPrimary.end_ms,
+                primaryUuid,
+            );
+        }
+        const currentRowUuid = currentDragRowResolution.rowUuid;
 
         //first cache if it's new row
         if(currentRowUuid && currentRowUuid != activeRowCache.rowUuid) {
@@ -778,11 +879,6 @@ export const useSnapping = ({
             endMs: null as number | null,
         }
 
-        const primaryUuid = dnd.value.state.draggingFrame.uuid;
-        if (primaryUuid == null) return;
-        const freeformPrimary = dnd.value.state.draggingPlaceholders[primaryUuid];
-        if (!freeformPrimary) return;
-
         const dependency = {
             frame: {
                 start_ms: freeformPrimary.start_ms,
@@ -792,14 +888,7 @@ export const useSnapping = ({
             event: 'drag',
         } as SnapDependencyInterface;
 
-        // When rowLocked (JoinRows), override the row to the original row so the
-        // highlighter stays pinned — same logic as dnd.ts setPlaceholderPosition.
-        const rowLocked = dnd.value.state.rowLocked;
-        const lockedRowUuid = rowLocked ? dnd.value.state.draggingFrame.data?.rowUuid ?? null : null;
-        const effectiveRowUuid = lockedRowUuid ?? timeline.state.pointer.over.rowUuid ?? null;
-        if (rowLocked && lockedRowUuid && lockedRowUuid !== activeRowCache.rowUuid) {
-            cacheActiveRow(lockedRowUuid);
-        }
+        const effectiveRowUuid = currentRowUuid;
 
         // Snapshot kept for reference — not used now that we have lastGroupSafeDragPosition.
         // const safePositionSnapshot = { ...lastNotOverflowedPosition };
@@ -1010,6 +1099,7 @@ export const useSnapping = ({
             lastGroupSafeDragPosition = { top: null, left: null, startMs: null, endMs: null }
             state.dragSnapGuides = [];
             state.draggingPlaceholders = {};
+            currentDragRowResolution = { rowUuid: null, top: null };
             // Invalidate the cached row so the next drag rebuilds it from fresh
             // timeline state. Without this, dragging frame B right after dragging
             // frame A onto the same row would see A's pre-drag position.
