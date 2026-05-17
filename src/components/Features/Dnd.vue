@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, inject, onUnmounted, watch } from 'vue';
+import { computed, inject, onUnmounted, Slots, watch } from 'vue';
 import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
@@ -7,6 +7,17 @@ import { useDnd, UseDndType } from '../../composables/features/dnd';
 import FrameUI from '../Timeline/UI/FrameUI.vue';
 import { TimelineFrameByUuidInterface } from '../../types/timeline';
 import { DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
+
+// Slots provided by <Timeline>. Used so the drag ghost honours the same
+// #frame template the user defined at the Timeline root — without forcing
+// them to repeat the template inside <Dnd>.
+const timelineSlots = inject<Slots>('timelineSlots');
+
+// Functional component that delegates to the injected `frame` slot. When the
+// user didn't pass #frame, this returns null and we omit the slot template
+// entirely (FrameUI's default title+time fallback fires instead).
+const UserFrame = (props: Record<string, unknown>) =>
+    timelineSlots?.frame?.(props) ?? null;
 
 const props = withDefaults(defineProps<{
     edgeSnap?: boolean,
@@ -67,6 +78,7 @@ const handleOnDrop = (_frames: TimelineFrameByUuidInterface[], frameData: Dragge
             rowUuid: item.rowUuid ?? original.rowUuid,
             sectionUuid: item.sectionUuid ?? original.sectionUuid,
             linkGroupUuid: original.linkGroupUuid,
+            meta: original.meta,
         });
     });
 };
@@ -117,15 +129,21 @@ const ghostLinkFlags = (uuid: string | number) => {
             }"
         >
             <FrameUI
+                :uuid="entry.uuid"
                 :start-ms="entry.start_ms"
                 :end-ms="entry.end_ms"
                 :title="dnd?.draggingFrame(entry.uuid)?.title ?? null"
+                :meta="dnd?.draggingFrame(entry.uuid)?.meta"
                 :left="0"
                 :width="entry.width"
                 :selected="true"
                 :linked-above="ghostLinkFlags(entry.uuid).linkedAbove"
                 :linked-below="ghostLinkFlags(entry.uuid).linkedBelow"
-            />
+            >
+                <template v-if="timelineSlots?.frame" #frame="slotProps">
+                    <UserFrame v-bind="slotProps" />
+                </template>
+            </FrameUI>
         </div>
 
         <!--

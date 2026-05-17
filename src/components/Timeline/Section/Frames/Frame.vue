@@ -96,11 +96,13 @@ const isOverlapping = computed(() => {
 <template>
     <FrameUI
         ref="frameUi"
+        :uuid="uuid"
         :left="frame.editorRelativeLeft"
         :width="frame.width"
         :start-ms="frame.start_ms"
         :end-ms="frame.end_ms"
         :title="frame.title"
+        :meta="frame.meta"
         @click="(event) => container ? emits('click', event, container, frame, uuid) : null"
         @container-update="(event) => container ? emits('containerUpdate', event, frame, uuid) : null"
         :style="{
@@ -113,7 +115,10 @@ const isOverlapping = computed(() => {
         :linked-below="hasLinkedBelow"
         :overlapping="isOverlapping"
     >
-
+        <!-- Re-expose the `frame` slot to consumers further up the tree. -->
+        <template #frame="slotProps">
+            <slot name="frame" v-bind="slotProps" />
+        </template>
     </FrameUI>
     
 </template>

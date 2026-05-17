@@ -4,11 +4,15 @@ import useUtils from '../../../composables/utils';
 
 
 const props = withDefaults(defineProps<{
+    uuid?: string | number,
     left: number,
     width: number,
     startMs: number,
     endMs: number,
     title: string | null,
+    // Arbitrary per-frame payload, forwarded to the `frame` slot so consumers
+    // can render custom content based on their own data.
+    meta?: unknown,
     selected?: boolean,
     showResizeHandle?: boolean,
     // When true, this frame has a linked sibling in the row directly above/below.
@@ -112,20 +116,37 @@ const onClick = (event: PointerEvent) => {
                  time range, the topmost frame already carries the title+time;
                  hide them here so the joined block reads as one unit. -->
             <template v-if="!linkedAbove">
-                <div class="vtd__row-frame-title">
-                    {{ title }}
-                </div>
-                <div class="vtd__row-frame-time">
-                    {{ secondsToTimeString({
-                        seconds: startMs / 1000,
-                        format: 'hh:mm:ss a'
-                    }) }} -
-                    {{ secondsToTimeString({
-                        seconds: endMs / 1000,
-                        format: 'hh:mm:ss a'
-                    }) }}
+                <!-- `frame` slot replaces the inner content while keeping the
+                     container, borders, resize handles, and all interactive
+                     behaviour intact. Default fallback is the built-in
+                     title+time block so existing consumers don't change. -->
+                <slot
+                    name="frame"
+                    :uuid="uuid"
+                    :title="title"
+                    :startMs="startMs"
+                    :endMs="endMs"
+                    :meta="meta"
+                    :selected="selected"
+                    :linkedAbove="linkedAbove"
+                    :linkedBelow="linkedBelow"
+                    :overlapping="overlapping"
+                >
+                    <div class="vtd__row-frame-title">
+                        {{ title }}
+                    </div>
+                    <div class="vtd__row-frame-time">
+                        {{ secondsToTimeString({
+                            seconds: startMs / 1000,
+                            format: 'hh:mm:ss a'
+                        }) }} -
+                        {{ secondsToTimeString({
+                            seconds: endMs / 1000,
+                            format: 'hh:mm:ss a'
+                        }) }}
 
-                </div>
+                    </div>
+                </slot>
             </template>
 
             <slot></slot>

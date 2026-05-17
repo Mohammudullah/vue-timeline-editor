@@ -27,9 +27,9 @@ const frameContainerUpdate = (container: HTMLDivElement | null, frame: TimelineF
 </script>
 
 <template>
-    <Row 
-        v-for="uuid in props.uuids" 
-        :key="uuid" 
+    <Row
+        v-for="uuid in props.uuids"
+        :key="uuid"
         :uuid="uuid"
         :height="config.rows.height ?? 0"
         @frame-click="frameClick"
@@ -37,5 +37,9 @@ const frameContainerUpdate = (container: HTMLDivElement | null, frame: TimelineF
         :timeline="props.timeline"
         :config="props.config"
         :features="props.features"
-    />
+    >
+        <template #frame="slotProps">
+            <slot name="frame" v-bind="slotProps" />
+        </template>
+    </Row>
 </template>

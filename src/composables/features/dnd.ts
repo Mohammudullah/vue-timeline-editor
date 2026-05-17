@@ -80,6 +80,7 @@ export const useDnd = ({
         editorRelativeLeft: f.editorRelativeLeft,
         width: f.width,
         linkGroupUuid: f.linkGroupUuid,
+        meta: f.meta,
     });
 
     const buildDragSnapshot = () => {

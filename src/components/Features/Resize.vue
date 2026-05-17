@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, inject, onUnmounted, watch } from 'vue';
+import { computed, inject, onUnmounted, Slots, watch } from 'vue';
 import { useFeatures } from '../../composables/features/features';
 import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
@@ -7,6 +7,12 @@ import { useResize } from '../../composables/features/resize';
 import { TimelineFrameByUuidInterface } from '../../types/timeline';
 import { ResizedFrameDataInterface } from '../../composables/features/draggingEvents';
 import FrameUI from '../Timeline/UI/FrameUI.vue';
+
+// Same forwarding pattern as <Dnd>: the resize ghost needs to honour the
+// user's #frame template from <Timeline>.
+const timelineSlots = inject<Slots>('timelineSlots');
+const UserFrame = (props: Record<string, unknown>) =>
+    timelineSlots?.frame?.(props) ?? null;
 
 const emits = defineEmits<{
     'resizeStart':  [frames: TimelineFrameByUuidInterface[], event: PointerEvent],
@@ -61,6 +67,7 @@ const handleResized = (frames: TimelineFrameByUuidInterface[], frameData: Resize
             rowUuid: item.rowUuid ?? original.rowUuid,
             sectionUuid: item.sectionUuid ?? original.sectionUuid,
             linkGroupUuid: original.linkGroupUuid,
+            meta: original.meta,
         });
     });
 };
@@ -105,16 +112,22 @@ const ghostLinkFlags = (uuid: string | number) => {
             }"
         >
             <FrameUI
+                :uuid="entry.uuid"
                 :start-ms="entry.start_ms"
                 :end-ms="entry.end_ms"
                 :title="timeline?.state.sectionFramesByUuid[entry.uuid]?.title ?? null"
+                :meta="timeline?.state.sectionFramesByUuid[entry.uuid]?.meta"
                 :left="0"
                 :width="entry.width"
                 :selected="true"
                 :linked-above="ghostLinkFlags(entry.uuid).linkedAbove"
                 :linked-below="ghostLinkFlags(entry.uuid).linkedBelow"
                 show-resize-handle
-            />
+            >
+                <template v-if="timelineSlots?.frame" #frame="slotProps">
+                    <UserFrame v-bind="slotProps" />
+                </template>
+            </FrameUI>
         </div>
     </Teleport>
 </template>

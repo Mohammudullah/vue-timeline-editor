@@ -122,6 +122,7 @@ export const useTimeline = (
             editorRelativeLeft: frameLeft,
             width: width,
             linkGroupUuid: frame.linkGroupUuid,
+            meta: frame.meta,
         }
     }
 

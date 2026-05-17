@@ -58,6 +58,10 @@ const isHovered = computed(() =>
             :features="props.features"
             @click="(event, container, frame, uuid) => emits('frameClick', event, frame, container, uuid)"
             @containerUpdate="(container, frame, uuid) => emits('frameContainerUpdate', container, frame, uuid)"
-         />
+         >
+            <template #frame="slotProps">
+                <slot name="frame" v-bind="slotProps" />
+            </template>
+         </Frame>
     </div>
 </template>

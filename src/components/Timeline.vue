@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, provide, ref } from 'vue';
+import { onBeforeUnmount, onMounted, provide, ref, useSlots } from 'vue';
 import { useTimeline, UseTimelineInterface } from '../composables/timeline';
 import { TimelineRangeArgInterface } from '../types/timeline';
 import { TimelineConfigInterface, useTimelineConfig } from '../composables/timelineConfig';
@@ -67,6 +67,11 @@ const features = useFeatures({
 provide('timeline', timeline);
 provide('timelineConfig', timelineConfig);
 provide('features', features);
+// Expose our own slots to descendant feature components (e.g. <Dnd/> renders
+// drag ghosts and needs to honour the same #frame template the user passed
+// here). Vue slots aren't naturally accessible from child components, so we
+// hand them out via inject.
+provide('timelineSlots', useSlots());
 
 const onTimelineScroll = (event: Event) => {
     const target = event.target as HTMLDivElement | null;
@@ -176,7 +181,11 @@ onBeforeUnmount(() => {
                                 :config="timelineConfig"
                                 :timeline="timeline"
                                 :features="features"
-                            />
+                            >
+                                <template #frame="slotProps">
+                                    <slot name="frame" v-bind="slotProps" />
+                                </template>
+                            </Section>
                         </div>
 
                         <div id="editorAreaTeleports"></div>

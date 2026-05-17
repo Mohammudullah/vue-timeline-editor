@@ -27,6 +27,9 @@ export interface TimelineFrameInterface {
     start_ms: number,
     end_ms: number,
     linkGroupUuid?: string | number,
+    // Arbitrary per-frame payload. Forwarded untouched into the `#frame` slot
+    // so consumers can render custom content based on their own data.
+    meta?: unknown,
 }
 
 export interface TimelineFrameByUuidInterface {
@@ -39,6 +42,7 @@ export interface TimelineFrameByUuidInterface {
     editorRelativeLeft: number,
     width: number,
     linkGroupUuid?: string | number,
+    meta?: unknown,
 }
 
 export interface TimelineFrameByUuidBasicInterface {
@@ -49,6 +53,7 @@ export interface TimelineFrameByUuidBasicInterface {
     rowUuid: string | number,
     sectionUuid: string | number,
     linkGroupUuid?: string | number,
+    meta?: unknown,
 }
 
 

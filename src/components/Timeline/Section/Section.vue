@@ -44,7 +44,11 @@ const section = computed<TimelineSectionByUuidInterface | null>(() => {
                 :timeline="timeline"
                 :config="config"
                 :features="features"
-            />
+            >
+                <template #frame="slotProps">
+                    <slot name="frame" v-bind="slotProps" />
+                </template>
+            </Rows>
         </div>
     </div>
 </template>
