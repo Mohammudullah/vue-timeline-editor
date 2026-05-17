@@ -19,6 +19,15 @@ export const useSnapGuideLines = ({
         // One { top, height } segment per section — covers only the row area,
         // skipping each section's label bar so grid lines stay invisible there.
         sectionRowAreas: [],
+        // Row the pointer is currently over. Mirrors timeline.state.pointer.over.rowUuid
+        // but is namespaced under this feature so the row-hover highlight is gated on
+        // <SnapGuideLines/> being mounted — disable the feature and the highlight
+        // disappears too.
+        hoveredRowUuid: null,
+    });
+
+    watchEffect(() => {
+        state.hoveredRowUuid = timeline.state.pointer.over.rowUuid ?? null;
     });
 
     watchEffect(() => {
@@ -85,4 +94,5 @@ export interface SnapGuideLinesStateInterface {
     majorGridPositions: { ms: number, left: number }[],
     minorGridPositions: { ms: number, left: number }[],
     sectionRowAreas: { top: number, height: number }[],
+    hoveredRowUuid: string | number | null,
 }

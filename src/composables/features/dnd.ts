@@ -360,10 +360,22 @@ export const useDnd = ({
     };
 
 
+    // When an OS-level overlay (screenshot tool, system dialog, alt-tab) takes
+    // the pointer mid-drag, the browser fires `lostpointercapture` but no
+    // `pointerup`/`pointercancel`. Without handling that, `state.dragging`
+    // stays true until the user clicks back into the editor. Treat it as a
+    // cancellation — we don't know whether the user released over a valid
+    // drop target.
+    const onLostPointerCapture = (event: PointerEvent) => {
+        if (state.dragging) cancelDrag(event);
+        pendingDrag = null;
+    };
+
     const editorPointerEvents = {
         'pointerdown': startDrag,
         'pointerup': drop,
         'pointercancel': cancelDrag,
+        'lostpointercapture': onLostPointerCapture,
     } as const;
 
     type eventTypes = keyof typeof editorPointerEvents;

@@ -102,20 +102,25 @@ const onClick = (event: PointerEvent) => {
             @pointermove="onPointerMove"
             @click="onClick"
         >
-            <div class="vtd__row-frame-title">
-                {{ title }}
-            </div>
-            <div class="vtd__row-frame-time">
-                {{ secondsToTimeString({
-                    seconds: startMs / 1000,
-                    format: 'hh:mm:ss a'
-                }) }} - 
-                {{ secondsToTimeString({
-                    seconds: endMs / 1000,
-                    format: 'hh:mm:ss a'
-                }) }}
+            <!-- When this frame is stacked under a linked sibling at the same
+                 time range, the topmost frame already carries the title+time;
+                 hide them here so the joined block reads as one unit. -->
+            <template v-if="!linkedAbove">
+                <div class="vtd__row-frame-title">
+                    {{ title }}
+                </div>
+                <div class="vtd__row-frame-time">
+                    {{ secondsToTimeString({
+                        seconds: startMs / 1000,
+                        format: 'hh:mm:ss a'
+                    }) }} -
+                    {{ secondsToTimeString({
+                        seconds: endMs / 1000,
+                        format: 'hh:mm:ss a'
+                    }) }}
 
-            </div>
+                </div>
+            </template>
 
             <slot></slot>
         </div>

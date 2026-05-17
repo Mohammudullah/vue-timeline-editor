@@ -129,6 +129,11 @@
     background-color: rgba(0, 120, 215, 0.02);
 }
 
+.vtd__row--hovered,
+.vtd__row--hovered:nth-child(odd) {
+    background-color: rgba(0, 120, 215, 0.04);
+}
+
 .vtd__row-frame-container {
     height: 100%;
 }
@@ -158,12 +163,14 @@
 }
 
 .vtd__row-frame-resize-handle {
-    /* Sits on vtd__row-frame-container, absolutely positioned so it protrudes
-       outside the frame on each side. Large touch target (28px wide). */
+    /* Sits on vtd__row-frame-container, centred exactly on the visible grip
+       so the resize cursor + resize behaviour only fire on the bar itself.
+       A wider hit target would eat into small frames and prevent click/drag
+       from the middle of the frame. */
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    width: 28px;
+    width: 8px;
     height: 100%;
     cursor: ew-resize;
     display: flex;
@@ -173,11 +180,11 @@
 }
 
 .vtd__frame-resize-left-handle {
-    left: -14px;
+    left: -4px;
 }
 
 .vtd__frame-resize-right-handle {
-    right: -14px;
+    right: -4px;
 }
 
 .vtd__row-frame-resize-handle-grip {

@@ -25,10 +25,19 @@ const emits = defineEmits<{
 
 const frameUuids = computed(() => props.timeline.state.sectionFrameUuids[props.uuid])
 
+// True when SnapGuideLines is mounted AND the pointer is currently over this
+// row. The class is applied unconditionally here; the gate is whether the
+// feature is even providing a non-null `hoveredRowUuid`. Color/styling lives
+// in basic-theme.css under `.vtd__row--hovered`.
+const isHovered = computed(() =>
+    props.features.data.snapGuideLines?.state.hoveredRowUuid === props.uuid
+)
+
 </script>
 <template>
     <div
         class="vtd__row"
+        :class="{ 'vtd__row--hovered': isHovered }"
         :style="{
             height: props.height + 'px',
             paddingLeft: props.config.editor.paddingLeft + 'px',

@@ -39,8 +39,12 @@ const rowUuids = computed(() => {
     return sectionUuid != null ? props.timeline.state.sectionRowUuids[sectionUuid] ?? [] : [];
 });
 
-// True when the immediately adjacent row above contains a frame sharing this
-// frame's linkGroupUuid. Used to flatten the top edge for a connected look.
+// True when this frame is visually stacked with a linked sibling in the row
+// directly above — same linkGroupUuid AND same start/end. Used to flatten the
+// top edge and to hide redundant title/time on all but the topmost frame of a
+// connected group. Linked frames that share a group but sit in non-adjacent
+// rows, or have different time ranges, are "joined but not together" and
+// continue to render their own header.
 const hasLinkedAbove = computed(() => {
     const f = frame.value;
     if (!f?.linkGroupUuid) return false;
@@ -48,12 +52,14 @@ const hasLinkedAbove = computed(() => {
     if (idx <= 0) return false;
     const aboveRowUuid = rowUuids.value[idx - 1];
     return Object.values(props.timeline.state.sectionFramesByUuid).some(
-        fr => fr.rowUuid === aboveRowUuid && fr.linkGroupUuid === f.linkGroupUuid
+        fr => fr.rowUuid === aboveRowUuid
+            && fr.linkGroupUuid === f.linkGroupUuid
+            && fr.start_ms === f.start_ms
+            && fr.end_ms === f.end_ms
     );
 });
 
-// True when the immediately adjacent row below contains a frame sharing this
-// frame's linkGroupUuid.
+// Symmetric check for the row directly below.
 const hasLinkedBelow = computed(() => {
     const f = frame.value;
     if (!f?.linkGroupUuid) return false;
@@ -61,7 +67,10 @@ const hasLinkedBelow = computed(() => {
     if (idx < 0 || idx >= rowUuids.value.length - 1) return false;
     const belowRowUuid = rowUuids.value[idx + 1];
     return Object.values(props.timeline.state.sectionFramesByUuid).some(
-        fr => fr.rowUuid === belowRowUuid && fr.linkGroupUuid === f.linkGroupUuid
+        fr => fr.rowUuid === belowRowUuid
+            && fr.linkGroupUuid === f.linkGroupUuid
+            && fr.start_ms === f.start_ms
+            && fr.end_ms === f.end_ms
     );
 });
 

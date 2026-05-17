@@ -155,6 +155,15 @@ export const useResize = ({
 
         timeline.enableEdgeScrolling();
 
+        // Capture the pointer to the editor for the remainder of the gesture
+        // so pointerup/pointercancel reach our listeners even when the cursor
+        // leaves the editor's hit area. Without this the user could mouse-up
+        // outside the editor and we'd never see the release — leaving
+        // `state.resizing` stuck on until the next click inside.
+        if (timeline.state.editor && !timeline.state.editor.hasPointerCapture?.(event.pointerId)) {
+            timeline.state.editor.setPointerCapture(event.pointerId);
+        }
+
         if (state.resizingFrame.frame) {
             draggingEvents.triggerOnResizeStart(getResizingFrames(), event);
         }
@@ -319,10 +328,19 @@ export const useResize = ({
     };
 
 
+    // OS-level interruptions (screenshot tools, system dialogs, alt-tab) fire
+    // `lostpointercapture` without a matching `pointerup`/`pointercancel`.
+    // Cancel the resize so `state.resizing` doesn't stay stuck on until the
+    // user clicks back into the editor.
+    const onLostPointerCapture = (event: PointerEvent) => {
+        if (state.resizing) cancelResize(event);
+    };
+
     const editorPointerEvents = {
         'pointerdown': startResize,
         'pointerup': resized,
         'pointercancel': cancelResize,
+        'lostpointercapture': onLostPointerCapture,
     } as const;
 
     type eventTypes = keyof typeof editorPointerEvents;

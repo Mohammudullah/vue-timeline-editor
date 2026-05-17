@@ -362,21 +362,30 @@ export const useTimeline = (
 
         const rect = scrollPaneEl.value.getBoundingClientRect();
 
-        const scrollThreshold = 50;
+        // Tighter than before (was 50px) so the last visible row isn't fully
+        // inside the scroll-trigger zone — the user can drop on it without
+        // the pane auto-scrolling away. Speed is ramped linearly with
+        // proximity so the very edge still scrolls fast, while just inside
+        // the threshold barely moves.
+        const scrollThreshold = 15;
+        const maxScrollStep = 12;
+
+        const rampedStep = (distance: number) =>
+            Math.max(1, Math.round(maxScrollStep * (1 - distance / scrollThreshold)));
 
         let scrollX = 0;
         let scrollY = 0;
-        if(event.clientX - rect.left < scrollThreshold) {
-            scrollX = -10;
-        } else if(rect.right - event.clientX < scrollThreshold) {
-            scrollX = 10;
-        }
 
-        if(event.clientY - rect.top < scrollThreshold) {
-            scrollY = -10;
-        } else if(rect.bottom - event.clientY < scrollThreshold) {
-            scrollY = 10;
-        }
+        const distLeft = event.clientX - rect.left;
+        const distRight = rect.right - event.clientX;
+        const distTop = event.clientY - rect.top;
+        const distBottom = rect.bottom - event.clientY;
+
+        if (distLeft < scrollThreshold) scrollX = -rampedStep(distLeft);
+        else if (distRight < scrollThreshold) scrollX = rampedStep(distRight);
+
+        if (distTop < scrollThreshold) scrollY = -rampedStep(distTop);
+        else if (distBottom < scrollThreshold) scrollY = rampedStep(distBottom);
 
         if(scrollX !== 0 || scrollY !== 0) {
             scrollPaneEl.value.scrollBy(scrollX, scrollY);
