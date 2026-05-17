@@ -14,12 +14,17 @@ export const useSnapping = ({
     frames,
     dnd,
     resize,
+    pipelines,
 } : {
     timeline: UseTimelineInterface,
     timelineConfig: TimelineConfigInterface,
     frames: UseFramesType,
     dnd: Ref<UseDndType | null>,
     resize: Ref<UseResizeInterface | null>,
+    // Per-step toggles. Each defaults to ON; explicit `false` removes that
+    // step from the active pipeline. Passed as a Ref/computed so consumers
+    // can flip toggles at runtime via component props.
+    pipelines?: Ref<SnappingPipelineToggles>,
 }) => {
 
     const dragging = computed(() => dnd.value?.state.dragging || false);
@@ -841,19 +846,32 @@ export const useSnapping = ({
         return false;
     };
 
-    const dragSnapPipeline = [
-        snapRows,
-        snapFrames,
-        snapTimesOnDrag,
-        snapGuides,
-        protectOverLappingFrames,
-    ]
+    // Each pipeline step is gated on its corresponding toggle. `pipelines` is
+    // an optional Ref provided by <Snapping/> — when absent or when a toggle
+    // is left undefined, the step runs (default ON). Setting a toggle to
+    // `false` removes that step from the active pipeline at runtime, so
+    // consumers can disable e.g. overlap protection by passing
+    // `:overlapping="false"` without forking the composable.
+    const isOn = (key: keyof SnappingPipelineToggles) =>
+        pipelines?.value?.[key] !== false;
+
+    const dragSnapPipeline = computed(() => {
+        const steps = [];
+        if (isOn('rows')) steps.push(snapRows);
+        if (isOn('frames')) steps.push(snapFrames);
+        if (isOn('times')) steps.push(snapTimesOnDrag);
+        if (isOn('guides')) steps.push(snapGuides);
+        if (isOn('overlapping')) steps.push(protectOverLappingFrames);
+        return steps;
+    });
 
 
-    const resizeSnapPipeline = [
-        snapTimesOnResize,
-        protectOverLappingFrames,
-    ]
+    const resizeSnapPipeline = computed(() => {
+        const steps = [];
+        if (isOn('times')) steps.push(snapTimesOnResize);
+        if (isOn('overlapping')) steps.push(protectOverLappingFrames);
+        return steps;
+    });
 
 
     const snapOnDragPipeline = () => {
@@ -915,7 +933,7 @@ export const useSnapping = ({
         // Snapshot kept for reference — not used now that we have lastGroupSafeDragPosition.
         // const safePositionSnapshot = { ...lastNotOverflowedPosition };
 
-        dragSnapPipeline.forEach((snapFunction) => {
+        dragSnapPipeline.value.forEach((snapFunction) => {
             snapPosition = snapFunction(dependency, snapPosition.top, snapPosition.left, snapPosition.startMs, snapPosition.endMs) as { top: number | null; left: number | null; startMs: number | null; endMs: number | null };
 
         });
@@ -1030,7 +1048,7 @@ export const useSnapping = ({
         // Snapshot kept for reference — not used now that we have lastGroupSafeResizePosition.
         // const safeResizeSnapshot = { ...lastNotOverflowedPosition };
 
-        resizeSnapPipeline.forEach((snapFunction) => {
+        resizeSnapPipeline.value.forEach((snapFunction) => {
             snapPosition = snapFunction(dependency, snapPosition.top, snapPosition.left, snapPosition.startMs, snapPosition.endMs) as { top: number | null; left: number | null; startMs: number | null; endMs: number | null };
         });
 
@@ -1213,6 +1231,18 @@ export const useSnapping = ({
 }
 
 export type UseSnappingInterface = ReturnType<typeof useSnapping>;
+
+// Per-step toggles for the snapping pipeline. Each is independent and defaults
+// to ON; setting one to `false` removes that step from both the drag and
+// resize pipelines where it applies. `times` toggles grid-snap on both drag
+// and resize; `overlapping` toggles overlap protection on both.
+export interface SnappingPipelineToggles {
+    rows?: boolean,
+    frames?: boolean,
+    times?: boolean,
+    guides?: boolean,
+    overlapping?: boolean,
+}
 
 export interface SnappingStateInterface {
     // Validated snapped positions for all active drag ghosts, keyed by frame uuid.
