@@ -16,8 +16,12 @@ const props = withDefaults(defineProps<{
     // feels connected yet distinct.
     linkedAbove?: boolean,
     linkedBelow?: boolean,
+    // True when this frame's time range overlaps another frame's in the same
+    // row. Triggers a semi-transparent style so the stacked frames are both
+    // visible. Used when overlap protection is disabled.
+    overlapping?: boolean,
 }>(), {
-    
+
 })
 
 
@@ -71,6 +75,7 @@ const onClick = (event: PointerEvent) => {
 <template>
     <div
         class="vtd__row-frame-container"
+        :class="{ 'vtd__row-frame-container--selected': selected }"
         ref="container"
         :style="{
             left: left + 'px',
@@ -90,12 +95,13 @@ const onClick = (event: PointerEvent) => {
             <div class="vtd__row-frame-resize-handle-grip no-dragging"></div>
         </div>
 
-        <div 
+        <div
             class="vtd__row-frame"
             :class="{
                 'vtd__row-frame-selected': selected,
                 'vtd__row-frame--linked-above': linkedAbove,
                 'vtd__row-frame--linked-below': linkedBelow,
+                'vtd__row-frame--overlapping': overlapping,
             }"
             style="overflow: hidden;"
             @pointerdown="onPointerDown"

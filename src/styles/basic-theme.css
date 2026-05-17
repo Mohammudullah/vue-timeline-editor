@@ -162,6 +162,24 @@
     border: 2px solid rgb(0, 120, 215);
 }
 
+.vtd__row-frame--overlapping {
+    background-color: rgba(255, 255, 255, 0.6);
+    border-style: dashed;
+}
+
+/* When selected, the frame foregrounds and forces full opacity so its
+   text stays readable even on top of an overlapping sibling. The z-index
+   has to live on the positioned container (the inner .vtd__row-frame is
+   static and would be clipped by its sibling's container otherwise). */
+.vtd__row-frame-container--selected {
+    z-index: 3;
+}
+
+.vtd__row-frame--overlapping.vtd__row-frame-selected {
+    background-color: white;
+    border-style: solid;
+}
+
 .vtd__row-frame-resize-handle {
     /* Sits on vtd__row-frame-container, centred exactly on the visible grip
        so the resize cursor + resize behaviour only fire on the bar itself.

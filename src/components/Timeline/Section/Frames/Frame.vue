@@ -74,6 +74,23 @@ const hasLinkedBelow = computed(() => {
     );
 });
 
+// True when another frame in the SAME row shares any part of this frame's
+// time range. Surfaces the overlap state to the UI so a stacked frame can
+// render semi-transparent and not visually swallow what's underneath.
+// Touching edges (start == otherEnd or end == otherStart) is not overlap.
+const isOverlapping = computed(() => {
+    const f = frame.value;
+    if (!f) return false;
+    const all = props.timeline.state.sectionFramesByUuid;
+    for (const key in all) {
+        const other = all[key];
+        if (other.uuid === f.uuid) continue;
+        if (other.rowUuid !== f.rowUuid) continue;
+        if (other.start_ms < f.end_ms && other.end_ms > f.start_ms) return true;
+    }
+    return false;
+});
+
 </script>
 
 <template>
@@ -94,6 +111,7 @@ const hasLinkedBelow = computed(() => {
         :show-resize-handle="props.selected && !props.dragging && props.resizable"
         :linked-above="hasLinkedAbove"
         :linked-below="hasLinkedBelow"
+        :overlapping="isOverlapping"
     >
 
     </FrameUI>
