@@ -150,6 +150,12 @@ export const useSnapping = ({
         const pointerOnMs = timeline.state.pointer.on_ms;
         const pointerRowUuid = timeline.state.pointer.over.rowUuid ?? null;
 
+        // When overlap protection is off, frames are allowed to overlap, so
+        // there's nothing to "hop away from" — the pointer's row is always a
+        // valid target. Disables row-hopping entirely (both the blocker
+        // detection and the availability search below).
+        const overlappingOn = pipelines?.value?.overlapping !== false;
+
         // True iff the pointer is currently inside (horizontally) some frame
         // in `rowUuid`. This is the precise condition under which
         // protectOverLappingFrames refuses to advance the placeholder.
@@ -165,6 +171,7 @@ export const useSnapping = ({
         };
 
         const canFitInRow = (rowUuid: string | number): boolean => {
+            if (!overlappingOn) return true;
             if (frameStartMs == null || frameEndMs == null || excludeUuid == null) return true;
             return !wouldOverlapInRow(rowUuid, frameStartMs, frameEndMs, excludeUuid);
         };
@@ -172,8 +179,10 @@ export const useSnapping = ({
         const rowTop = (rowUuid: string | number): number | null =>
             timeline.state.sectionRowsByUuid[rowUuid]?.editorRelativeTop ?? null;
 
-        // 1. Pointer over a row, and not on a blocker → stay.
-        if (pointerRowUuid && !pointerOnBlockerIn(pointerRowUuid)) {
+        // 1. Pointer over a row → stay there. With overlap on, we additionally
+        // require the pointer not to be sitting on a blocker; with overlap off
+        // we always honour the pointer's row.
+        if (pointerRowUuid && (!overlappingOn || !pointerOnBlockerIn(pointerRowUuid))) {
             return { rowUuid: pointerRowUuid, top: rowTop(pointerRowUuid) };
         }
 
