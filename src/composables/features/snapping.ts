@@ -52,25 +52,46 @@ export const useSnapping = ({
     });
 
 
-    const cacheActiveRow = (rowUuid: string | number) => {
+    // Builds the active-row cache. The dragging/resizing frame must be
+    // excluded from both the frame list AND the empty-area calculation —
+    // otherwise the cache treats the frame's *original* position as occupied,
+    // which:
+    //   - shrinks adjacent empty-area fragments below the frame's duration,
+    //     making the "fits in empty area" guard reject valid placements;
+    //   - exposes the dragging frame's own edges as snap targets in
+    //     snapFrames (the frame would try to snap to itself).
+    // Recomputing inline (instead of copying the prebuilt row.emptyAreas array
+    // from timeline state) is what makes the cache reflect "where there's
+    // space for this drag," not "where there's space ignoring the drag."
+    const cacheActiveRow = (rowUuid: string | number, excludeFrameUuid?: string | number | null) => {
 
-        // cache empty areas in the active row to help snapping frames to empty areas and protect from dragging to non-empty areas
-        const emptyAreas = timeline.state.sectionRowsByUuid[rowUuid].emptyAreas;
-        activeRowCache.emptyAreas.starts = emptyAreas.map(area => area.start_ms);
-        activeRowCache.emptyAreas.ends = emptyAreas.map(area => area.end_ms); 
+        const framesInRow = Object.values(timeline.state.sectionFramesByUuid)
+            .filter(frame => frame.rowUuid === rowUuid && frame.uuid !== excludeFrameUuid);
 
+        activeRowCache.frames.starts = framesInRow.map(f => f.start_ms);
+        activeRowCache.frames.ends = framesInRow.map(f => f.end_ms);
+        activeRowCache.frames.uuids = framesInRow.map(f => f.uuid);
 
-        // also cache frames in the active row to help snapping frames to empty areas and protect from dragging to non-empty areas
-
-        activeRowCache.frames.starts = [];
-        activeRowCache.frames.ends = [];
-        activeRowCache.frames.uuids = [];
-
-        Object.values(timeline.state.sectionFramesByUuid).filter(frame => frame.rowUuid === rowUuid).map(frame => {
-            activeRowCache.frames.starts.push(frame.start_ms);
-            activeRowCache.frames.ends.push(frame.end_ms);
-            activeRowCache.frames.uuids.push(frame.uuid);
-        });
+        // Empty areas: sweep frames in time order and record the gaps. Mirrors
+        // timeline.ts' getEmptyAreasOfRow but with the dragging frame removed.
+        const sorted = [...framesInRow].sort((a, b) => a.start_ms - b.start_ms);
+        const rangeEnd = timelineConfig.range.end_seconds * 1000;
+        const starts: number[] = [];
+        const ends: number[] = [];
+        let cursor = 0;
+        for (const frame of sorted) {
+            if (frame.start_ms > cursor) {
+                starts.push(cursor);
+                ends.push(frame.start_ms);
+            }
+            cursor = Math.max(cursor, frame.end_ms);
+        }
+        if (cursor < rangeEnd) {
+            starts.push(cursor);
+            ends.push(rangeEnd);
+        }
+        activeRowCache.emptyAreas.starts = starts;
+        activeRowCache.emptyAreas.ends = ends;
 
         activeRowCache.rowUuid = rowUuid;
     }
@@ -864,9 +885,10 @@ export const useSnapping = ({
         }
         const currentRowUuid = currentDragRowResolution.rowUuid;
 
-        //first cache if it's new row
+        //first cache if it's new row (exclude the dragging frame so the
+        //cache reflects "where there's space for this drag")
         if(currentRowUuid && currentRowUuid != activeRowCache.rowUuid) {
-            cacheActiveRow(currentRowUuid);
+            cacheActiveRow(currentRowUuid, primaryUuid);
         }
 
         // Reset active snap guide markers each tick; snap functions repopulate them.
@@ -984,8 +1006,9 @@ export const useSnapping = ({
         if(!resize.value || !resize.value.state.resizing) return;
 
         const currentRowUuid = resize.value.state.resizingFrame.frame?.rowUuid;
+        const resizingPrimaryUuid = resize.value.state.resizingFrame.uuid;
         if(currentRowUuid && currentRowUuid != activeRowCache.rowUuid) {
-            cacheActiveRow(currentRowUuid);
+            cacheActiveRow(currentRowUuid, resizingPrimaryUuid);
         }
 
         let snapPosition = {
