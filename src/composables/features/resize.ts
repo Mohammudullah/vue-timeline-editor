@@ -204,7 +204,27 @@ export const useResize = ({
             });
         });
 
-        return { initial, current };
+        return { initial, current, revert: buildRevert(initial) };
+    };
+
+
+    // See dnd.ts:buildRevert for the rationale. Re-applies the pre-resize
+    // snapshot via `timeline.updateFrame`. Idempotent.
+    const buildRevert = (initial: FrameDataItem[]) => () => {
+        for (const item of initial) {
+            const original = timeline.state.sectionFramesByUuid[item.uuid];
+            if (!original) continue;
+            timeline.updateFrame(item.uuid, {
+                uuid: item.uuid,
+                title: original.title,
+                linkGroupUuid: original.linkGroupUuid,
+                meta: original.meta,
+                start_ms: item.start_ms,
+                end_ms: item.end_ms,
+                rowUuid: item.rowUuid ?? original.rowUuid,
+                sectionUuid: item.sectionUuid ?? original.sectionUuid,
+            });
+        }
     };
 
 

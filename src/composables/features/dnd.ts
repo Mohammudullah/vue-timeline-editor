@@ -83,6 +83,29 @@ export const useDnd = ({
         meta: f.meta,
     });
 
+    // Builds a closure that re-applies the pre-drag snapshot via
+    // `timeline.updateFrame`. Captures `initial` by reference; that array is
+    // re-cloned by `cloneData` before reaching consumers, so each event's
+    // `revert` is bound to its own snapshot. Idempotent — calling twice
+    // writes the same values twice. Preserves title/meta/linkGroupUuid by
+    // reading the current frame, since those aren't carried in `initial`.
+    const buildRevert = (initial: FrameDataItem[]) => () => {
+        for (const item of initial) {
+            const original = timeline.state.sectionFramesByUuid[item.uuid];
+            if (!original) continue;
+            timeline.updateFrame(item.uuid, {
+                uuid: item.uuid,
+                title: original.title,
+                linkGroupUuid: original.linkGroupUuid,
+                meta: original.meta,
+                start_ms: item.start_ms,
+                end_ms: item.end_ms,
+                rowUuid: item.rowUuid ?? original.rowUuid,
+                sectionUuid: item.sectionUuid ?? original.sectionUuid,
+            });
+        }
+    };
+
     const buildDragSnapshot = () => {
         dragSnapshot = {};
         for (const uuid of frames.state.selectedUuids) {
@@ -153,7 +176,7 @@ export const useDnd = ({
             });
         });
 
-        return { initial, current };
+        return { initial, current, revert: buildRevert(initial) };
     };
 
 

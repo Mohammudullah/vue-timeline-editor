@@ -294,10 +294,32 @@ export const useSnapping = ({
             });
         });
 
-        return { initial, current };
+        return { initial, current, revert: buildRevert(initial) };
     }
-    
-    
+
+
+    // See dnd.ts:buildRevert. Snapping re-wraps upstream drop/resize payloads
+    // with snapped `current` values; `revert` here is bound to the same
+    // canonical `initial` snapshot so reverting goes back to the true
+    // pre-interaction state, not the snapped freeform position.
+    const buildRevert = (initial: FrameDataItem[]) => () => {
+        for (const item of initial) {
+            const original = timeline.state.sectionFramesByUuid[item.uuid];
+            if (!original) continue;
+            timeline.updateFrame(item.uuid, {
+                uuid: item.uuid,
+                title: original.title,
+                linkGroupUuid: original.linkGroupUuid,
+                meta: original.meta,
+                start_ms: item.start_ms,
+                end_ms: item.end_ms,
+                rowUuid: item.rowUuid ?? original.rowUuid,
+                sectionUuid: item.sectionUuid ?? original.sectionUuid,
+            });
+        }
+    };
+
+
     const getResizingFrameData = (upstream?: ResizedFrameDataInterface) : ResizedFrameDataInterface => {
 
         const primaryUuid = resize.value?.state.resizingFrame.uuid;
@@ -338,7 +360,7 @@ export const useSnapping = ({
             });
         });
 
-        return { initial, current };
+        return { initial, current, revert: buildRevert(initial) };
     }
 
 

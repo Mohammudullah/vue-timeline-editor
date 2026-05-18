@@ -251,7 +251,11 @@ import '../src/styles/basic-theme.css';
                 }]"
             />
             <Dnd/>
-            <Snapping/>
+            <Snapping
+                @drop="(frames, frameData, event) => {
+                    frameData.revert()
+                }"
+            />
             <Resize/>
             <SnapGuideLines/>
             <JoinRows/>

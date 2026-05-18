@@ -51,11 +51,9 @@ const handleResizeCancel = (frames: TimelineFrameByUuidInterface[], frameData: R
     console.log('Resize cancelled:', frames, frameData);
 };
 const handleResized = (frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent) => {
-    emits('resized', frames, frameData, event);
-    console.log('Resized:', frames, frameData);
-
-    // `frameData.current` carries one entry per resized frame (primary first).
-    // Persist every entry so all selected frames resize together.
+    // Persist FIRST, then emit. See Dnd.vue's handleOnDrop for the rationale —
+    // synchronous `revert()` calls in the consumer's @resized handler need the
+    // frame to already be at its `current` position.
     frameData.current.forEach(item => {
         const original = timeline?.state.sectionFramesByUuid[item.uuid];
         if (!original) return;
@@ -70,6 +68,9 @@ const handleResized = (frames: TimelineFrameByUuidInterface[], frameData: Resize
             meta: original.meta,
         });
     });
+
+    emits('resized', frames, frameData, event);
+    console.log('Resized:', frames, frameData);
 };
 
 watch(activeHandler, (newHandler, oldHandler) => {

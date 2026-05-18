@@ -62,11 +62,13 @@ const handleOnDragCancel = (frames: TimelineFrameByUuidInterface[], frameData: D
     console.log('Drag cancelled:', frames, frameData);
 };
 const handleOnDrop = (_frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => {
-    emits('drop', _frames, frameData, event);
-    console.log('Dropped:', _frames, frameData);
-
-    // `frameData.current` carries one entry per dragged frame (primary first).
-    // Persist every entry so all selected frames move together.
+    // Persist FIRST, then emit. Vue emits are synchronous, so a @drop handler
+    // that calls `frameData.revert()` synchronously needs the frame to already
+    // be at its `current` position — otherwise revert would write `initial`
+    // values that are the same as what's already there, and the subsequent
+    // updateFrame would still move the frame to `current` (no visible revert).
+    // `frameData.current` carries one entry per dragged frame (primary first);
+    // persist every entry so all selected frames move together.
     frameData.current.forEach(item => {
         const original = timeline?.state.sectionFramesByUuid[item.uuid];
         if (!original) return;
@@ -81,6 +83,9 @@ const handleOnDrop = (_frames: TimelineFrameByUuidInterface[], frameData: Dragge
             meta: original.meta,
         });
     });
+
+    emits('drop', _frames, frameData, event);
+    console.log('Dropped:', _frames, frameData);
 };
 
 watch(activeHandler, (newHandler, oldHandler) => {

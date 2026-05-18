@@ -64,7 +64,16 @@ onUnmounted(() => {
 snapping.value?.onDragStart((frames, event) => emits('dragStart', frames, event), 'snappingComponentOnDragStart');
 snapping.value?.onDragEnd((frames, frameData, event) => emits('dragEnd', frames, frameData, event), 'snappingComponentOnDragEnd');
 snapping.value?.onDragCancel((frames, frameData, event) => emits('dragCancel', frames, frameData, event), 'snappingComponentOnDragCancel');
-snapping.value?.onDrop((frames, frameData, event) => emits('drop', frames, frameData, event), 'snappingComponentOnDrop');
+// Defer the drop emit by one microtask so any other sync handlers on
+// snapping.onDrop have run first — in particular Dnd.vue's `handleOnDrop`,
+// which is registered later (via a reactive watch) and performs persistence.
+// Without this defer, the consumer's @drop handler would fire BEFORE
+// persistence, and a synchronous `frameData.revert()` would just rewrite the
+// pre-drop values (no visible effect) before persistence then moved the frame
+// to its `current` position.
+snapping.value?.onDrop((frames, frameData, event) => {
+    queueMicrotask(() => emits('drop', frames, frameData, event));
+}, 'snappingComponentOnDrop');
 
 </script>
 

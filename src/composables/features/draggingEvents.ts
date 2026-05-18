@@ -44,7 +44,15 @@ export const useDraggingEvents = () => {
     const cloneFrames = (frames: TimelineFrameByUuidInterface[]) =>
         JSON.parse(JSON.stringify(frames)) as TimelineFrameByUuidInterface[];
 
-    const cloneData = <T>(data: T): T => JSON.parse(JSON.stringify(data));
+    // Deep-clone the `initial`/`current` arrays (so handlers can't mutate
+    // them across each other) while keeping any function fields on the
+    // payload (e.g. `revert`) by reference — functions don't survive JSON
+    // serialization and are stateless anyway.
+    const cloneData = <T extends { initial: FrameDataItem[], current: FrameDataItem[] }>(data: T): T => ({
+        ...data,
+        initial: JSON.parse(JSON.stringify(data.initial)),
+        current: JSON.parse(JSON.stringify(data.current)),
+    });
 
     const triggerOnDragStart = (frames: TimelineFrameByUuidInterface[], event: PointerEvent) => {
         events.dragStart.forEach(h => h.handler(cloneFrames(frames), event));
@@ -121,9 +129,16 @@ export interface FrameDataItem {
 export interface DraggedFrameDataInterface {
     initial: FrameDataItem[],
     current: FrameDataItem[],
+    // One-shot helper that re-applies `initial` to the live frame map via
+    // `timeline.updateFrame`. Intended for the "server save failed → put
+    // the frame back" path. Idempotent. Available on every event payload
+    // regardless of which feature components are mounted — does not require
+    // a history feature.
+    revert: () => void,
 }
 
 export interface ResizedFrameDataInterface {
     initial: FrameDataItem[],
     current: FrameDataItem[],
+    revert: () => void,
 }
