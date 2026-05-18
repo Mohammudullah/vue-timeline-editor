@@ -32,6 +32,14 @@ const props = withDefaults(defineProps<{
     // hides the resize handle so the user can't kick off a competing
     // mutation — drag/resize are also blocked at the composable level.
     pending?: boolean,
+    // True for a few hundred ms when the user *tried* to drag/resize this
+    // frame while another frame was processing. Triggers a shake animation
+    // (no spinner) — "no, not now".
+    blocked?: boolean,
+    // True for a few hundred ms when a blocked attempt happens on a
+    // DIFFERENT frame and this one is the actually-processing one. Adds a
+    // pulse ring so the user's eye is drawn here ("I'm the busy one").
+    attention?: boolean,
 }>(), {
 
 })
@@ -116,6 +124,8 @@ const onClick = (event: PointerEvent) => {
                 'vtd__row-frame--overlapping': overlapping,
                 'vtd__row-frame--highlight-blink': highlighted,
                 'vtd__frame-processing': pending,
+                'vtd__frame-blocked': blocked,
+                'vtd__frame-processing--attention': attention,
             }"
             style="overflow: hidden;"
             @pointerdown="onPointerDown"

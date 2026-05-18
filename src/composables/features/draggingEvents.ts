@@ -16,17 +16,20 @@ export const useDraggingEvents = () => {
     type DragDataHandler = (frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => void;
     type ResizeLifecycleHandler = (frames: TimelineFrameByUuidInterface[], event: PointerEvent) => void;
     type ResizeDataHandler = (frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent) => void;
+    type BlockedHandler = (reason: BlockedReason, frames: TimelineFrameByUuidInterface[], event: PointerEvent) => void;
 
     const events = {
         'dragStart':    [] as { id: string, handler: DragLifecycleHandler }[],
         'dragEnd':      [] as { id: string, handler: DragDataHandler }[],
         'dragCancel':   [] as { id: string, handler: DragDataHandler }[],
         'drop':         [] as { id: string, handler: DragDataHandler }[],
+        'dragBlocked':  [] as { id: string, handler: BlockedHandler }[],
 
         'resizeStart':  [] as { id: string, handler: ResizeLifecycleHandler }[],
         'resizeEnd':    [] as { id: string, handler: ResizeDataHandler }[],
         'resized':      [] as { id: string, handler: ResizeDataHandler }[],
         'resizeCancel': [] as { id: string, handler: ResizeDataHandler }[],
+        'resizeBlocked':[] as { id: string, handler: BlockedHandler }[],
     };
 
     const registerEvent = (type: keyof typeof events, handler: any, id: string) => {
@@ -80,38 +83,60 @@ export const useDraggingEvents = () => {
         events.resizeCancel.forEach(h => h.handler(cloneFrames(frames), cloneData(frameData), event));
     };
 
-    const onDragStart  = (handler: DragLifecycleHandler, id: string) => registerEvent('dragStart',  handler, id);
-    const onDragEnd    = (handler: DragDataHandler,      id: string) => registerEvent('dragEnd',    handler, id);
-    const onDragCancel = (handler: DragDataHandler,      id: string) => registerEvent('dragCancel', handler, id);
-    const onDrop       = (handler: DragDataHandler,      id: string) => registerEvent('drop',       handler, id);
+    const triggerOnDragBlocked = (reason: BlockedReason, frames: TimelineFrameByUuidInterface[], event: PointerEvent) => {
+        events.dragBlocked.forEach(h => h.handler(reason, cloneFrames(frames), event));
+    };
+    const triggerOnResizeBlocked = (reason: BlockedReason, frames: TimelineFrameByUuidInterface[], event: PointerEvent) => {
+        events.resizeBlocked.forEach(h => h.handler(reason, cloneFrames(frames), event));
+    };
 
-    const onResizeStart  = (handler: ResizeLifecycleHandler, id: string) => registerEvent('resizeStart',  handler, id);
-    const onResizeEnd    = (handler: ResizeDataHandler,      id: string) => registerEvent('resizeEnd',    handler, id);
-    const onResized      = (handler: ResizeDataHandler,      id: string) => registerEvent('resized',      handler, id);
-    const onResizeCancel = (handler: ResizeDataHandler,      id: string) => registerEvent('resizeCancel', handler, id);
+    const onDragStart   = (handler: DragLifecycleHandler, id: string) => registerEvent('dragStart',   handler, id);
+    const onDragEnd     = (handler: DragDataHandler,      id: string) => registerEvent('dragEnd',     handler, id);
+    const onDragCancel  = (handler: DragDataHandler,      id: string) => registerEvent('dragCancel',  handler, id);
+    const onDrop        = (handler: DragDataHandler,      id: string) => registerEvent('drop',        handler, id);
+    const onDragBlocked = (handler: BlockedHandler,       id: string) => registerEvent('dragBlocked', handler, id);
+
+    const onResizeStart   = (handler: ResizeLifecycleHandler, id: string) => registerEvent('resizeStart',   handler, id);
+    const onResizeEnd     = (handler: ResizeDataHandler,      id: string) => registerEvent('resizeEnd',     handler, id);
+    const onResized       = (handler: ResizeDataHandler,      id: string) => registerEvent('resized',       handler, id);
+    const onResizeCancel  = (handler: ResizeDataHandler,      id: string) => registerEvent('resizeCancel',  handler, id);
+    const onResizeBlocked = (handler: BlockedHandler,         id: string) => registerEvent('resizeBlocked', handler, id);
 
     return {
         onDragStart,
         onDragEnd,
         onDragCancel,
         onDrop,
+        onDragBlocked,
         triggerOnDragStart,
         triggerOnDragEnd,
         triggerOnDragCancel,
         triggerOnDrop,
+        triggerOnDragBlocked,
 
         onResizeStart,
         onResizeEnd,
         onResized,
         onResizeCancel,
+        onResizeBlocked,
         triggerOnResizeStart,
         triggerOnResizeEnd,
         triggerOnResized,
         triggerOnResizeCancel,
+        triggerOnResizeBlocked,
 
         removeEvent,
     };
 };
+
+
+/**
+ * Reason a drag/resize attempt was rejected. Open union — only
+ * 'in_processing' is currently fired; consumers should still type their
+ * handler against the union so future reasons (e.g. an explicit per-frame
+ * lock) flow through without breaking the contract.
+ */
+export type BlockedReason = 'in_processing' | 'locked';
 
 
 /**

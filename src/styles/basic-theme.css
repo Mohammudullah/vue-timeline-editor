@@ -211,6 +211,36 @@
     pointer-events: none;
 }
 
+/* `signalBlocked` puts this class on the frame the user just tried to
+   drag/resize while another frame was busy. Quick horizontal shake — the
+   universal "no, can't" gesture. Auto-removed after the animation by the
+   timeline composable. No spinner, no fade — clearly different from the
+   actually-processing frame so the user can tell them apart. */
+@keyframes vtd-frame-blocked-shake {
+    0%, 100% { transform: translateX(0); }
+    20%      { transform: translateX(-5px); }
+    40%      { transform: translateX(5px); }
+    60%      { transform: translateX(-4px); }
+    80%      { transform: translateX(3px); }
+}
+
+.vtd__frame-blocked {
+    animation: vtd-frame-blocked-shake 0.4s ease-in-out;
+}
+
+/* When a blocked attempt happens, the actually-processing frame(s) get
+   this class for a moment — a soft ring pulse around them. Tells the user
+   "look here, THIS is the one you're waiting for". Stacks on top of
+   `vtd__frame-processing` so the spinner keeps running underneath. */
+@keyframes vtd-frame-processing-attention-pulse {
+    0%, 100% { box-shadow: 0 0 0 0   rgba(0, 120, 215, 0);    }
+    50%      { box-shadow: 0 0 0 5px rgba(0, 120, 215, 0.3); }
+}
+
+.vtd__frame-processing--attention {
+    animation: vtd-frame-processing-attention-pulse 0.6s ease-in-out;
+}
+
 /* When selected, the frame foregrounds and forces full opacity so its
    text stays readable even on top of an overlapping sibling. The z-index
    has to live on the positioned container (the inner .vtd__row-frame is

@@ -1288,11 +1288,13 @@ export const useSnapping = ({
         oldDnd?.removeEvent('dragEnd', 'snappingComposableOnDragEnd');
         oldDnd?.removeEvent('dragCancel', 'snappingComposableOnDragCancel');
         oldDnd?.removeEvent('drop', 'snappingComposableOnDrop');
+        oldDnd?.removeEvent('dragBlocked', 'snappingComposableOnDragBlocked');
 
         newDnd?.onDragStart((dragFrames, event) => draggingEvents.triggerOnDragStart(dragFrames, event), 'snappingComposableOnDragStart');
         newDnd?.onDragEnd((dragFrames, frameData, event) => draggingEvents.triggerOnDragEnd(dragFrames, getDraggingFrameData(frameData), event), 'snappingComposableOnDragEnd');
         newDnd?.onDragCancel((dragFrames, frameData, event) => draggingEvents.triggerOnDragCancel(dragFrames, getDraggingFrameData(frameData), event), 'snappingComposableOnDragCancel');
         newDnd?.onDrop((dragFrames, frameData, event) => draggingEvents.triggerOnDrop(dragFrames, getDraggingFrameData(frameData), event), 'snappingComposableOnDrop');
+        newDnd?.onDragBlocked((reason, dragFrames, event) => draggingEvents.triggerOnDragBlocked(reason, dragFrames, event), 'snappingComposableOnDragBlocked');
     }, { immediate: true })
 
 
@@ -1300,11 +1302,13 @@ export const useSnapping = ({
         oldResize?.removeEvent('resizeStart', 'snappingComposableOnResizeStart');
         oldResize?.removeEvent('resizeEnd', 'snappingComposableOnResizeEnd');
         oldResize?.removeEvent('resizeCancel', 'snappingComposableOnResizeCancel');
+        oldResize?.removeEvent('resizeBlocked', 'snappingComposableOnResizeBlocked');
 
         newResize?.onResizeStart((resizeFrames, event) => draggingEvents.triggerOnResizeStart(resizeFrames, event), 'snappingComposableOnResizeStart');
         newResize?.onResizeEnd((resizeFrames, frameData, event) => draggingEvents.triggerOnResizeEnd(resizeFrames, getResizingFrameData(frameData), event), 'snappingComposableOnResizeEnd');
         newResize?.onResized((resizeFrames, frameData, event) => draggingEvents.triggerOnResized(resizeFrames, getResizingFrameData(frameData), event), 'snappingComposableOnResized');
         newResize?.onResizeCancel((resizeFrames, frameData, event) => draggingEvents.triggerOnResizeCancel(resizeFrames, getResizingFrameData(frameData), event), 'snappingComposableOnResizeCancel');
+        newResize?.onResizeBlocked((reason, resizeFrames, event) => draggingEvents.triggerOnResizeBlocked(reason, resizeFrames, event), 'snappingComposableOnResizeBlocked');
     }, { immediate: true })
 
 
@@ -1314,11 +1318,13 @@ export const useSnapping = ({
         onDragEnd: draggingEvents.onDragEnd,
         onDragCancel: draggingEvents.onDragCancel,
         onDrop: draggingEvents.onDrop,
+        onDragBlocked: draggingEvents.onDragBlocked,
 
         onResizeStart: draggingEvents.onResizeStart,
         onResizeEnd: draggingEvents.onResizeEnd,
         onResizeCancel: draggingEvents.onResizeCancel,
         onResized: draggingEvents.onResized,
+        onResizeBlocked: draggingEvents.onResizeBlocked,
 
         removeEvent: draggingEvents.removeEvent,
     }

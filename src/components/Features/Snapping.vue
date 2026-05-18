@@ -5,7 +5,7 @@ import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
 import { useSnapping } from '../../composables/features/snapping';
 import { TimelineFrameByUuidInterface } from '../../types/timeline';
-import { DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
+import { BlockedReason, DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
 
 // Pipeline step toggles. Each defaults to true; pass `false` to remove that
 // step from the active pipeline at runtime (e.g. `:overlapping="false"` to
@@ -26,10 +26,14 @@ const props = withDefaults(defineProps<{
 });
 
 const emits = defineEmits<{
-    'dragStart':  [frames: TimelineFrameByUuidInterface[], event: PointerEvent],
-    'dragEnd':    [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
-    'dragCancel': [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
-    'drop':       [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'dragStart':   [frames: TimelineFrameByUuidInterface[], event: PointerEvent],
+    'dragEnd':     [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'dragCancel':  [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'drop':        [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    // Fires when a drag attempt was rejected — see Dnd.vue for details.
+    // Mirrored here so consumers using <Snapping> as their primary event
+    // source still see it.
+    'dragBlocked': [reason: BlockedReason, frames: TimelineFrameByUuidInterface[], event: PointerEvent],
 }>()
 
 const timeline = inject<UseTimelineInterface>('timeline');
@@ -64,6 +68,7 @@ onUnmounted(() => {
 snapping.value?.onDragStart((frames, event) => emits('dragStart', frames, event), 'snappingComponentOnDragStart');
 snapping.value?.onDragEnd((frames, frameData, event) => emits('dragEnd', frames, frameData, event), 'snappingComponentOnDragEnd');
 snapping.value?.onDragCancel((frames, frameData, event) => emits('dragCancel', frames, frameData, event), 'snappingComponentOnDragCancel');
+snapping.value?.onDragBlocked?.((reason, frames, event) => emits('dragBlocked', reason, frames, event), 'snappingComponentOnDragBlocked');
 // Defer the drop emit by one microtask so any other sync handlers on
 // snapping.onDrop have run first — in particular Dnd.vue's `handleOnDrop`,
 // which is registered later (via a reactive watch) and performs persistence.

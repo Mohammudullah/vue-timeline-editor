@@ -125,7 +125,11 @@ export const useResize = ({
         // here directly. The flash adds the attempted uuids to the loading
         // map briefly so the user sees feedback rather than a silent no-op.
         if (timeline.shouldBlockMutation(frames.state.selectedUuids)) {
-            timeline.flashBlocked(frames.state.selectedUuids);
+            timeline.signalBlocked(frames.state.selectedUuids);
+            const attemptedFrames = frames.state.selectedUuids
+                .map(u => timeline.state.sectionFramesByUuid[u])
+                .filter((f): f is TimelineFrameByUuidInterface => f != null);
+            draggingEvents.triggerOnResizeBlocked('in_processing', attemptedFrames, event);
             return;
         }
 
@@ -480,6 +484,7 @@ export const useResize = ({
         onResizeEnd: draggingEvents.onResizeEnd,
         onResizeCancel: draggingEvents.onResizeCancel,
         onResized: draggingEvents.onResized,
+        onResizeBlocked: draggingEvents.onResizeBlocked,
         removeEvent: draggingEvents.removeEvent,
     };
 };

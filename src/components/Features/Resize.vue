@@ -5,7 +5,7 @@ import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useResize } from '../../composables/features/resize';
 import { TimelineFrameByUuidInterface } from '../../types/timeline';
-import { ResizedFrameDataInterface } from '../../composables/features/draggingEvents';
+import { BlockedReason, ResizedFrameDataInterface } from '../../composables/features/draggingEvents';
 import FrameUI from '../Timeline/UI/FrameUI.vue';
 
 // Same forwarding pattern as <Dnd>: the resize ghost needs to honour the
@@ -15,10 +15,13 @@ const UserFrame = (props: Record<string, unknown>) =>
     timelineSlots?.frame?.(props) ?? null;
 
 const emits = defineEmits<{
-    'resizeStart':  [frames: TimelineFrameByUuidInterface[], event: PointerEvent],
-    'resizeEnd':    [frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent],
-    'resized':      [frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent],
-    'resizeCancel': [frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent],
+    'resizeStart':   [frames: TimelineFrameByUuidInterface[], event: PointerEvent],
+    'resizeEnd':     [frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent],
+    'resized':       [frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent],
+    'resizeCancel':  [frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent],
+    // Fires when a resize attempt was rejected (another frame is processing
+    // / explicitly locked / etc). Consumers can show a toast or error.
+    'resizeBlocked': [reason: BlockedReason, frames: TimelineFrameByUuidInterface[], event: PointerEvent],
 }>();
 
 const timeline = inject<UseTimelineInterface>('timeline');
@@ -50,6 +53,10 @@ const handleResizeCancel = (frames: TimelineFrameByUuidInterface[], frameData: R
     emits('resizeCancel', frames, frameData, event);
     console.log('Resize cancelled:', frames, frameData);
 };
+const handleResizeBlocked = (reason: BlockedReason, frames: TimelineFrameByUuidInterface[], event: PointerEvent) => {
+    emits('resizeBlocked', reason, frames, event);
+    console.log('Resize blocked:', reason, frames);
+};
 const handleResized = (frames: TimelineFrameByUuidInterface[], frameData: ResizedFrameDataInterface, event: PointerEvent) => {
     // Persist FIRST, then emit. See Dnd.vue's handleOnDrop for the rationale —
     // synchronous `revert()` calls in the consumer's @resized handler need the
@@ -78,11 +85,13 @@ watch(activeHandler, (newHandler, oldHandler) => {
     oldHandler?.removeEvent('resizeEnd', 'activeHandlerOnResizeEnd');
     oldHandler?.removeEvent('resizeCancel', 'activeHandlerOnResizeCancel');
     oldHandler?.removeEvent('resized', 'activeHandlerOnResized');
+    oldHandler?.removeEvent('resizeBlocked', 'activeHandlerOnResizeBlocked');
 
     newHandler?.onResizeStart(handleResizeStart, 'activeHandlerOnResizeStart');
     newHandler?.onResizeEnd(handleResizeEnd, 'activeHandlerOnResizeEnd');
     newHandler?.onResized(handleResized, 'activeHandlerOnResized');
     newHandler?.onResizeCancel(handleResizeCancel, 'activeHandlerOnResizeCancel');
+    newHandler?.onResizeBlocked?.(handleResizeBlocked, 'activeHandlerOnResizeBlocked');
 }, { immediate: true });
 
 onUnmounted(() => {

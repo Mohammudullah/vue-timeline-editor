@@ -32,8 +32,17 @@ export interface TimelineInterface {
     // `pendingFrameUuids`: pending = race-protected (always immediate);
     // loading = visual cue (may be delayed). On a fast server response the
     // user never sees loading even though `pendingFrameUuids` was briefly
-    // set. Drives the `vtd__row-frame--pending` class.
+    // set. Drives the `vtd__frame-processing` class.
     loadingFrameUuids: Record<string | number, true>,
+    // Uuids whose "blocked" shake should play — a frame the user just tried
+    // to drag/resize but was denied because another frame is processing.
+    // Auto-clears after the shake duration. Drives `vtd__frame-blocked`.
+    blockedFrameUuids: Record<string | number, true>,
+    // Uuids that should pulse to draw attention — typically the currently-
+    // processing frames at the moment a blocked attempt happens elsewhere,
+    // so the user's eye is pointed at "this is the one to wait for". Drives
+    // `vtd__frame-processing--attention`.
+    attentionFrameUuids: Record<string | number, true>,
     // Current effective loading mode used by buildProcess. `delayed` waits
     // before showing the indicator; `immediate` shows it on first tick.
     // Adaptive: flips to `immediate` after two consecutive slow saves,
@@ -87,6 +96,8 @@ export const useTimeline = (
         pendingFrameUuids: {},
         loadingFrameUuids: {},
         loadingMode: 'delayed',
+        blockedFrameUuids: {},
+        attentionFrameUuids: {},
 
         sectionUuids: [],
         sectionRowUuids: {},
@@ -518,23 +529,41 @@ export const useTimeline = (
         return false;
     };
 
-    // Brief visual cue when a drag/resize was blocked. Adds the attempted
-    // uuids to `loadingFrameUuids` so the pulse animation flashes on them
-    // for FLASH_DURATION_MS — telling the user "something's still saving,
-    // hands off." Resetting the timer on repeated attempts keeps the flash
-    // alive while the user keeps trying. The cleanup is gated on the uuid
-    // NOT being in pendingFrameUuids so we never accidentally clear an
-    // actually-pending frame's pulse.
-    const flashTimers: Record<string | number, ReturnType<typeof setTimeout>> = {};
-    const FLASH_DURATION_MS = 500;
-    const flashBlocked = (uuids: (string | number)[]) => {
-        for (const u of uuids) {
-            state.loadingFrameUuids[u] = true;
-            if (flashTimers[u]) clearTimeout(flashTimers[u]);
-            flashTimers[u] = setTimeout(() => {
-                delete flashTimers[u];
-                if (!state.pendingFrameUuids[u]) delete state.loadingFrameUuids[u];
-            }, FLASH_DURATION_MS);
+    // Two visual cues fired together when a drag/resize is denied:
+    //   1. SHAKE the attempted frame(s) — `vtd__frame-blocked` class for
+    //      ~400ms. Says "no, can't do that here." Skipped for any uuid that
+    //      is ITSELF processing — that frame already has a spinner; shaking
+    //      it would just be noise.
+    //   2. PULSE every currently-processing frame — `vtd__frame-processing
+    //      --attention` for ~600ms. Pulls the user's eye to "this is what
+    //      you're waiting for", so they can tell whose save is in flight.
+    //
+    // Per-uuid timers are reset on repeat calls, so the user mashing on a
+    // blocked frame keeps both animations alive instead of stuttering.
+    const blockedTimers: Record<string | number, ReturnType<typeof setTimeout>> = {};
+    const attentionTimers: Record<string | number, ReturnType<typeof setTimeout>> = {};
+    const BLOCKED_SHAKE_MS = 400;
+    const ATTENTION_PULSE_MS = 600;
+
+    const signalBlocked = (attemptedUuids: (string | number)[]) => {
+        for (const u of attemptedUuids) {
+            // Skip shaking a frame that's already processing — it has a
+            // spinner; the attention pulse below is the right cue for it.
+            if (state.pendingFrameUuids[u]) continue;
+            state.blockedFrameUuids[u] = true;
+            if (blockedTimers[u]) clearTimeout(blockedTimers[u]);
+            blockedTimers[u] = setTimeout(() => {
+                delete blockedTimers[u];
+                delete state.blockedFrameUuids[u];
+            }, BLOCKED_SHAKE_MS);
+        }
+        for (const u in state.pendingFrameUuids) {
+            state.attentionFrameUuids[u] = true;
+            if (attentionTimers[u]) clearTimeout(attentionTimers[u]);
+            attentionTimers[u] = setTimeout(() => {
+                delete attentionTimers[u];
+                delete state.attentionFrameUuids[u];
+            }, ATTENTION_PULSE_MS);
         }
     };
 
@@ -626,7 +655,7 @@ export const useTimeline = (
         recordSaveDuration,
         setPendingBlockScope,
         shouldBlockMutation,
-        flashBlocked,
+        signalBlocked,
     };
 }
 

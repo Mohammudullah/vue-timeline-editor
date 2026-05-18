@@ -81,13 +81,26 @@ const isHighlighted = computed(() =>
     props.timeline.state.highlightedFrameUuids[props.uuid] === true
 );
 
-// Drives the visual loading state (pulse + hidden resize handles).
+// Drives the visual loading state (spinner + fade + hidden resize handles).
 // Reads from `loadingFrameUuids` (not `pendingFrameUuids`) — the two are
 // intentionally separate: pending = race protection, applied immediately;
 // loading = visual cue, possibly delayed so fast saves don't flash. The
 // timeline composable manages the relationship.
 const isPending = computed(() =>
     props.timeline.state.loadingFrameUuids[props.uuid] === true
+);
+
+// Brief "no, can't drag/resize this right now" shake. Set by
+// `signalBlocked` and auto-cleared after the shake animation finishes.
+const isBlocked = computed(() =>
+    props.timeline.state.blockedFrameUuids[props.uuid] === true
+);
+
+// Brief attention pulse on actually-processing frames, fired when a
+// blocked attempt happens on a DIFFERENT frame. Says "I'm the one you're
+// waiting for".
+const isAttention = computed(() =>
+    props.timeline.state.attentionFrameUuids[props.uuid] === true
 );
 
 // True when another frame in the SAME row shares any part of this frame's
@@ -132,6 +145,8 @@ const isOverlapping = computed(() => {
         :overlapping="isOverlapping"
         :highlighted="isHighlighted"
         :pending="isPending"
+        :blocked="isBlocked"
+        :attention="isAttention"
     >
         <!-- Re-expose the `frame` slot to consumers further up the tree. -->
         <template #frame="slotProps">

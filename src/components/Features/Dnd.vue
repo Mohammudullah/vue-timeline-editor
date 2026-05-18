@@ -6,7 +6,7 @@ import { useFeatures } from '../../composables/features/features';
 import { useDnd, UseDndType } from '../../composables/features/dnd';
 import FrameUI from '../Timeline/UI/FrameUI.vue';
 import { TimelineFrameByUuidInterface } from '../../types/timeline';
-import { DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
+import { BlockedReason, DraggedFrameDataInterface } from '../../composables/features/draggingEvents';
 
 // Slots provided by <Timeline>. Used so the drag ghost honours the same
 // #frame template the user defined at the Timeline root — without forcing
@@ -26,10 +26,13 @@ const props = withDefaults(defineProps<{
 });
 
 const emits = defineEmits<{
-    'dragStart':  [frames: TimelineFrameByUuidInterface[], event: PointerEvent],
-    'dragEnd':    [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
-    'dragCancel': [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
-    'drop':       [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'dragStart':   [frames: TimelineFrameByUuidInterface[], event: PointerEvent],
+    'dragEnd':     [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'dragCancel':  [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    'drop':        [frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent],
+    // Fires when a drag attempt was rejected (another frame is processing /
+    // explicitly locked / etc). Consumers can show a toast or error message.
+    'dragBlocked': [reason: BlockedReason, frames: TimelineFrameByUuidInterface[], event: PointerEvent],
 }>();
 
 const timeline = inject<UseTimelineInterface>('timeline');
@@ -60,6 +63,10 @@ const handleOnDragEnd = (frames: TimelineFrameByUuidInterface[], frameData: Drag
 const handleOnDragCancel = (frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => {
     emits('dragCancel', frames, frameData, event);
     console.log('Drag cancelled:', frames, frameData);
+};
+const handleOnDragBlocked = (reason: BlockedReason, frames: TimelineFrameByUuidInterface[], event: PointerEvent) => {
+    emits('dragBlocked', reason, frames, event);
+    console.log('Drag blocked:', reason, frames);
 };
 const handleOnDrop = (_frames: TimelineFrameByUuidInterface[], frameData: DraggedFrameDataInterface, event: PointerEvent) => {
     // Persist FIRST, then emit. Vue emits are synchronous, so a @drop handler
@@ -93,11 +100,13 @@ watch(activeHandler, (newHandler, oldHandler) => {
     oldHandler?.removeEvent('dragEnd', 'activeHandlerOnDragEnd');
     oldHandler?.removeEvent('dragCancel', 'activeHandlerOnDragCancel');
     oldHandler?.removeEvent('drop', 'activeHandlerOnDrop');
+    oldHandler?.removeEvent('dragBlocked', 'activeHandlerOnDragBlocked');
 
     newHandler?.onDragStart(handleOnDragStart, 'activeHandlerOnDragStart');
     newHandler?.onDragEnd(handleOnDragEnd, 'activeHandlerOnDragEnd');
     newHandler?.onDragCancel(handleOnDragCancel, 'activeHandlerOnDragCancel');
     newHandler?.onDrop(handleOnDrop, 'activeHandlerOnDrop');
+    newHandler?.onDragBlocked?.(handleOnDragBlocked, 'activeHandlerOnDragBlocked');
 }, { immediate: true });
 
 onUnmounted(() => {

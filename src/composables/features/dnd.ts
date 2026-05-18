@@ -303,9 +303,14 @@ export const useDnd = ({
         // User crossed the drag threshold while a pending save is in flight
         // somewhere. Flash the loading pulse on the attempted uuids so they
         // get visible feedback ("can't drag — something is saving"), then
-        // bail without activating the drag.
+        // bail without activating the drag. The `dragBlocked` event fires
+        // synchronously so consumers can show a toast / error message.
         if (pendingDrag.blocked) {
-            timeline.flashBlocked(frames.state.selectedUuids);
+            timeline.signalBlocked(frames.state.selectedUuids);
+            const attemptedFrames = frames.state.selectedUuids
+                .map(u => timeline.state.sectionFramesByUuid[u])
+                .filter((f): f is TimelineFrameByUuidInterface => f != null);
+            draggingEvents.triggerOnDragBlocked('in_processing', attemptedFrames, event ?? new PointerEvent('pointerdown'));
             pendingDrag = null;
             return;
         }
@@ -552,6 +557,7 @@ export const useDnd = ({
         onDragEnd: draggingEvents.onDragEnd,
         onDragCancel: draggingEvents.onDragCancel,
         onDrop: draggingEvents.onDrop,
+        onDragBlocked: draggingEvents.onDragBlocked,
         removeEvent: draggingEvents.removeEvent,
     };
 };
