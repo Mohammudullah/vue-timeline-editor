@@ -27,6 +27,11 @@ const props = withDefaults(defineProps<{
     // True while a `scrollToViewPort(uuid, true)` blink is active. Applies a
     // class that the theme animates; cleared automatically by the composable.
     highlighted?: boolean,
+    // True while async work registered via the event payload's `process()`
+    // is in flight (typically a server save). Applies a theme class and
+    // hides the resize handle so the user can't kick off a competing
+    // mutation — drag/resize are also blocked at the composable level.
+    pending?: boolean,
 }>(), {
 
 })
@@ -97,7 +102,7 @@ const onClick = (event: PointerEvent) => {
                 'vtd__row-frame-resize-handle--linked-above': linkedAbove,
                 'vtd__row-frame-resize-handle--linked-below': linkedBelow,
             }"
-            v-if="showResizeHandle"
+            v-if="showResizeHandle && !pending"
         >
             <div class="vtd__row-frame-resize-handle-grip no-dragging"></div>
         </div>
@@ -110,6 +115,7 @@ const onClick = (event: PointerEvent) => {
                 'vtd__row-frame--linked-below': linkedBelow,
                 'vtd__row-frame--overlapping': overlapping,
                 'vtd__row-frame--highlight-blink': highlighted,
+                'vtd__frame-processing': pending,
             }"
             style="overflow: hidden;"
             @pointerdown="onPointerDown"
@@ -162,7 +168,7 @@ const onClick = (event: PointerEvent) => {
                 'vtd__row-frame-resize-handle--linked-above': linkedAbove,
                 'vtd__row-frame-resize-handle--linked-below': linkedBelow,
             }"
-            v-if="showResizeHandle"
+            v-if="showResizeHandle && !pending"
         >
             <div class="vtd__row-frame-resize-handle-grip no-dragging"></div>
         </div>

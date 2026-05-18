@@ -118,6 +118,17 @@ export const useResize = ({
     const startResize = (event: PointerEvent) => {
         if (!frames.state.primary.uuid) return;
 
+        // Block resize when any pending save would conflict (scope decides
+        // whether that means global or just the attempted uuids — see
+        // timeline.setPendingBlockScope). Resize has no threshold concept
+        // (pointerdown on the handle IS the intent), so we flash + bail
+        // here directly. The flash adds the attempted uuids to the loading
+        // map briefly so the user sees feedback rather than a silent no-op.
+        if (timeline.shouldBlockMutation(frames.state.selectedUuids)) {
+            timeline.flashBlocked(frames.state.selectedUuids);
+            return;
+        }
+
         const target = event.target as HTMLElement;
 
         // If the resize handle being grabbed belongs to a non-primary but
@@ -204,7 +215,9 @@ export const useResize = ({
             });
         });
 
-        return { initial, current, revert: buildRevert(initial) };
+        const revert = buildRevert(initial);
+        const process = buildProcess(initial, revert);
+        return { initial, current, revert, process };
     };
 
 
@@ -225,6 +238,66 @@ export const useResize = ({
                 sectionUuid: item.sectionUuid ?? original.sectionUuid,
             });
         }
+    };
+
+    // See dnd.ts:buildProcess. Same shape: pending immediate (race protect),
+    // loading delayed/immediate per `timeline.state.loadingMode`, minShow
+    // hold, recordSaveDuration for adaptive mode-switching, de-duped reentry.
+    const buildProcess = (initial: FrameDataItem[], revert: () => void) => {
+        const uuids = initial.map(it => it.uuid);
+        let inFlight: Promise<unknown> | null = null;
+
+        return <T,>(task: () => Promise<T>): Promise<T> => {
+            if (inFlight) return inFlight as Promise<T>;
+
+            uuids.forEach(u => timeline.setPending(u, true));
+
+            let delayTimer: ReturnType<typeof setTimeout> | null = null;
+            let loadingShownAt = 0;
+            const startedAt = Date.now();
+
+            const showLoading = () => {
+                if (loadingShownAt) return;
+                loadingShownAt = Date.now();
+                uuids.forEach(u => { timeline.state.loadingFrameUuids[u] = true; });
+            };
+
+            if (timeline.state.loadingMode === 'immediate') {
+                showLoading();
+            } else {
+                delayTimer = setTimeout(showLoading, timeline.getLoadingDelay());
+            }
+
+            const cleanupAfterSettle = async () => {
+                if (delayTimer != null) {
+                    clearTimeout(delayTimer);
+                    delayTimer = null;
+                }
+                uuids.forEach(u => timeline.setPending(u, false));
+                timeline.recordSaveDuration(Date.now() - startedAt);
+
+                if (loadingShownAt) {
+                    const remaining = timeline.getLoadingMinShow() - (Date.now() - loadingShownAt);
+                    if (remaining > 0) await new Promise(r => setTimeout(r, remaining));
+                    uuids.forEach(u => { delete timeline.state.loadingFrameUuids[u]; });
+                }
+            };
+
+            const run = async (): Promise<T> => {
+                try {
+                    return await task();
+                } catch (err) {
+                    revert();
+                    throw err;
+                } finally {
+                    inFlight = null;
+                    cleanupAfterSettle();
+                }
+            };
+
+            inFlight = run();
+            return inFlight as Promise<T>;
+        };
     };
 
 

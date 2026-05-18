@@ -135,10 +135,19 @@ export interface DraggedFrameDataInterface {
     // regardless of which feature components are mounted — does not require
     // a history feature.
     revert: () => void,
+    // Wraps an async task with pending-state lifecycle: marks every affected
+    // frame as pending before the task runs, clears the flags when it
+    // settles, and auto-calls `revert` on rejection. The task's promise is
+    // returned so the consumer can still .then/.catch externally. Re-entry
+    // is de-duped — calling `process` while a previous call is still in
+    // flight returns the same in-flight promise rather than starting a
+    // second task.
+    process: <T>(task: () => Promise<T>) => Promise<T>,
 }
 
 export interface ResizedFrameDataInterface {
     initial: FrameDataItem[],
     current: FrameDataItem[],
     revert: () => void,
+    process: <T>(task: () => Promise<T>) => Promise<T>,
 }

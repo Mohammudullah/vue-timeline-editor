@@ -106,6 +106,78 @@ export const useDnd = ({
         }
     };
 
+    // Builds the `process` helper attached to drag event payloads. Wraps an
+    // async task with pending + loading-indicator lifecycle:
+    //   - mark every affected uuid pending immediately (race protection);
+    //   - schedule the loading indicator based on `timeline.state.loadingMode`:
+    //       'immediate' → show on tick 0
+    //       'delayed'   → show after `loadingDelayMs` (default 1 s)
+    //   - on settle: clear pending, hold loading for `loadingMinShowMs`
+    //     (default 500 ms) if it was ever shown, then clear it;
+    //   - on reject: also call `revert`.
+    // De-duped — a second call while the first is still in flight returns
+    // the same in-flight promise.
+    const buildProcess = (initial: FrameDataItem[], revert: () => void) => {
+        const uuids = initial.map(it => it.uuid);
+        let inFlight: Promise<unknown> | null = null;
+
+        return <T,>(task: () => Promise<T>): Promise<T> => {
+            if (inFlight) return inFlight as Promise<T>;
+
+            uuids.forEach(u => timeline.setPending(u, true));
+
+            let delayTimer: ReturnType<typeof setTimeout> | null = null;
+            let loadingShownAt = 0;
+            const startedAt = Date.now();
+
+            const showLoading = () => {
+                if (loadingShownAt) return;
+                loadingShownAt = Date.now();
+                uuids.forEach(u => { timeline.state.loadingFrameUuids[u] = true; });
+            };
+
+            if (timeline.state.loadingMode === 'immediate') {
+                showLoading();
+            } else {
+                delayTimer = setTimeout(showLoading, timeline.getLoadingDelay());
+            }
+
+            const cleanupAfterSettle = async () => {
+                if (delayTimer != null) {
+                    clearTimeout(delayTimer);
+                    delayTimer = null;
+                }
+                uuids.forEach(u => timeline.setPending(u, false));
+                timeline.recordSaveDuration(Date.now() - startedAt);
+
+                if (loadingShownAt) {
+                    const remaining = timeline.getLoadingMinShow() - (Date.now() - loadingShownAt);
+                    if (remaining > 0) await new Promise(r => setTimeout(r, remaining));
+                    uuids.forEach(u => { delete timeline.state.loadingFrameUuids[u]; });
+                }
+            };
+
+            const run = async (): Promise<T> => {
+                try {
+                    return await task();
+                } catch (err) {
+                    revert();
+                    throw err;
+                } finally {
+                    inFlight = null;
+                    // Run cleanup async — the user's promise resolves immediately
+                    // on task settle; loading-clear may take up to minShow ms
+                    // afterwards. Drag/resize unblock the moment pending clears
+                    // (synchronous inside cleanupAfterSettle).
+                    cleanupAfterSettle();
+                }
+            };
+
+            inFlight = run();
+            return inFlight as Promise<T>;
+        };
+    };
+
     const buildDragSnapshot = () => {
         dragSnapshot = {};
         for (const uuid of frames.state.selectedUuids) {
@@ -176,7 +248,9 @@ export const useDnd = ({
             });
         });
 
-        return { initial, current, revert: buildRevert(initial) };
+        const revert = buildRevert(initial);
+        const process = buildProcess(initial, revert);
+        return { initial, current, revert, process };
     };
 
 
@@ -188,7 +262,7 @@ export const useDnd = ({
     // Holds the initial pointerdown data for a frame that MIGHT become a drag.
     // Drag is deferred until the pointer moves more than DRAG_THRESHOLD pixels,
     // so a quick click can still fire 'click' on the frame and trigger deselection.
-    let pendingDrag: { pointerId: number, clientX: number, clientY: number } | null = null;
+    let pendingDrag: { pointerId: number, clientX: number, clientY: number, blocked: boolean } | null = null;
     const DRAG_THRESHOLD = 4;
 
 
@@ -210,14 +284,31 @@ export const useDnd = ({
         if (!primaryContainer) return;
         if (!primaryContainer.contains(target as Node)) return;
 
-        // Record a pending drag — don't activate yet so 'click' can still fire.
-        pendingDrag = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY };
+        // Capture whether mutation is blocked NOW; we still register the
+        // pending drag so click-to-select keeps working (block in startDrag
+        // would also kill the click path). The actual abort + visual flash
+        // happens in `activateDrag` once the user crosses the drag threshold —
+        // that way a click on a blocked frame just selects it silently, while
+        // an actual drag attempt flashes the loading pulse as feedback.
+        const blocked = timeline.shouldBlockMutation(frames.state.selectedUuids);
+
+        pendingDrag = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, blocked };
         setContainer();
     };
 
 
     const activateDrag = (event?: PointerEvent) => {
         if (state.dragging || !pendingDrag || !frames.state.primary.frame) return;
+
+        // User crossed the drag threshold while a pending save is in flight
+        // somewhere. Flash the loading pulse on the attempted uuids so they
+        // get visible feedback ("can't drag — something is saving"), then
+        // bail without activating the drag.
+        if (pendingDrag.blocked) {
+            timeline.flashBlocked(frames.state.selectedUuids);
+            pendingDrag = null;
+            return;
+        }
 
         state.dragging = true;
         state.draggingMoved = true;

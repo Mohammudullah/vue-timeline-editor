@@ -9,6 +9,23 @@ import JoinRows from '../src/components/Features/JoinRows.vue';
 import PanScroll from '../src/components/Features/PanScroll.vue';
 import '../src/styles/basic-theme.css';
 
+// Fake server: resolves after `ms` if `shouldFail` is false; rejects otherwise.
+// Toggle the constants below to exercise the success / failure paths.
+const SERVER_DELAY_MS = 1500;
+const SERVER_SHOULD_FAIL = false;
+
+const fakeServerSave = (payload: unknown) => new Promise((resolve, reject) => {
+    console.log('[fake server] saving:', payload);
+    setTimeout(() => {
+        if (SERVER_SHOULD_FAIL) {
+            console.warn('[fake server] failed — frame will auto-revert');
+            reject(new Error('simulated server error'));
+        } else {
+            console.log('[fake server] saved OK');
+            resolve(payload);
+        }
+    }, SERVER_DELAY_MS);
+});
 </script>
 
 <template>
@@ -252,11 +269,24 @@ import '../src/styles/basic-theme.css';
             />
             <Dnd/>
             <Snapping
-                @drop="(frames, frameData, event) => {
-                    frameData.revert()
+                @drop="(_frames, frameData) => {
+                    // `process(task)` =
+                    //   1. marks every affected frame pending (drag/resize blocked,
+                    //      pulse animation, resize handles hidden)
+                    //   2. runs `task()`
+                    //   3. resolve → clears pending, frame stays at `current`
+                    //   4. reject  → clears pending, auto-calls `revert()`, re-throws
+                    // Flip SERVER_SHOULD_FAIL in <script setup> to test the failure path.
+                    frameData.process(() => fakeServerSave(frameData.current))
+                        .catch(err => console.error('drop save failed:', err))
                 }"
             />
-            <Resize/>
+            <Resize
+                @resized="(_frames, frameData) => {
+                    frameData.process(() => fakeServerSave(frameData.current))
+                        .catch(err => console.error('resize save failed:', err))
+                }"
+            />
             <SnapGuideLines/>
             <JoinRows/>
             <PanScroll/>

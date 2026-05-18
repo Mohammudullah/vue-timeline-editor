@@ -22,6 +22,24 @@ export interface TimelineInterface {
     // animation duration expires. Frame.vue reads this and forwards it to
     // FrameUI as a class trigger.
     highlightedFrameUuids: Record<string | number, true>,
+    // Uuids currently in a "pending" state — usually meaning an async server
+    // save is in flight after a drop/resize/add. Drag and resize gestures
+    // are blocked while a frame is pending so a second mutation can't race
+    // with the first. Managed by `setPending` / `isPending`, or by the
+    // `process()` helper on drag/resize event payloads.
+    pendingFrameUuids: Record<string | number, true>,
+    // Uuids whose loading INDICATOR should be visible. Distinct from
+    // `pendingFrameUuids`: pending = race-protected (always immediate);
+    // loading = visual cue (may be delayed). On a fast server response the
+    // user never sees loading even though `pendingFrameUuids` was briefly
+    // set. Drives the `vtd__row-frame--pending` class.
+    loadingFrameUuids: Record<string | number, true>,
+    // Current effective loading mode used by buildProcess. `delayed` waits
+    // before showing the indicator; `immediate` shows it on first tick.
+    // Adaptive: flips to `immediate` after two consecutive slow saves,
+    // back to `delayed` after one fast save. User can force a mode via
+    // setLoadingMode('immediate' | 'delayed') instead of 'auto'.
+    loadingMode: 'delayed' | 'immediate',
     pointer: {
         clientX: number,
         clientY: number,
@@ -66,6 +84,9 @@ export const useTimeline = (
         rowsCount: 0,
         framesCount: 0,
         highlightedFrameUuids: {},
+        pendingFrameUuids: {},
+        loadingFrameUuids: {},
+        loadingMode: 'delayed',
 
         sectionUuids: [],
         sectionRowUuids: {},
@@ -411,6 +432,113 @@ export const useTimeline = (
     }
 
 
+    // Pending-frame API.
+    //
+    // A frame is "pending" while an async operation (typically a server save
+    // initiated from the consumer's @drop / @resized / @add handler) is in
+    // flight. Drag and resize gestures check this and abort early so the
+    // user can't kick off a second mutation while the first is still being
+    // persisted — preventing races between competing save requests.
+    //
+    // Consumers normally don't call these directly; the `process()` helper
+    // on event payloads (added in a later step) wraps mark + task + unmark
+    // for the common case. `setPending` and `isPending` are exposed for
+    // manual imperative control (e.g. external side-panel edits).
+    const setPending = (uuid: string | number | (string | number)[], pending: boolean) => {
+        const list = Array.isArray(uuid) ? uuid : [uuid];
+        for (const u of list) {
+            if (pending) state.pendingFrameUuids[u] = true;
+            else delete state.pendingFrameUuids[u];
+        }
+    };
+
+    const isPending = (uuid: string | number): boolean =>
+        state.pendingFrameUuids[uuid] === true;
+
+
+    // Adaptive loading-indicator tuning.
+    //
+    // `requestedMode` is what the consumer asked for via setLoadingMode.
+    // `state.loadingMode` is what's *currently in effect* — equal to
+    // requestedMode in 'immediate'/'delayed' override, or auto-flipped
+    // between 'delayed' and 'immediate' when the requested mode is 'auto'.
+    //
+    // `slowStreak` tracks consecutive saves that took >= loadingDelayMs.
+    // Two slow saves in a row → flip to immediate. A single fast save
+    // resets the streak and flips back to delayed.
+    let requestedMode: 'auto' | 'delayed' | 'immediate' = 'auto';
+    let slowStreak = 0;
+    let loadingDelayMs = 1000;
+    let loadingMinShowMs = 500;
+
+    const setLoadingMode = (mode: 'auto' | 'delayed' | 'immediate') => {
+        requestedMode = mode;
+        if (mode === 'auto') return;  // let current state.loadingMode persist
+        state.loadingMode = mode;
+        slowStreak = 0;
+    };
+
+    const setLoadingDelay = (ms: number) => { loadingDelayMs = Math.max(0, ms); };
+    const setLoadingMinShow = (ms: number) => { loadingMinShowMs = Math.max(0, ms); };
+    const getLoadingDelay = () => loadingDelayMs;
+    const getLoadingMinShow = () => loadingMinShowMs;
+
+    // Called by buildProcess (in dnd/resize/snapping) after each task settles.
+    // Updates slowStreak + state.loadingMode when in 'auto' mode. No-op when
+    // the consumer has forced a mode via setLoadingMode.
+    const recordSaveDuration = (durationMs: number) => {
+        if (requestedMode !== 'auto') return;
+        if (durationMs >= loadingDelayMs) {
+            slowStreak++;
+            if (slowStreak >= 2) state.loadingMode = 'immediate';
+        } else {
+            slowStreak = 0;
+            state.loadingMode = 'delayed';
+        }
+    };
+
+
+    // Block scope: how broadly a pending frame blocks new mutations.
+    //   'global' (default) — ANY pending frame blocks every other frame.
+    //                        Conservative; matches "one save at a time" servers.
+    //   'frame'           — only the actually-pending uuids (and JoinRows
+    //                        members) are blocked. Other rows stay live.
+    let pendingBlockScope: 'global' | 'frame' = 'global';
+    const setPendingBlockScope = (scope: 'global' | 'frame') => { pendingBlockScope = scope; };
+
+    // Returns true when a drag/resize attempt on `forUuids` should be blocked.
+    // In 'global' mode, any frame being pending blocks every attempt; in
+    // 'frame' mode only the attempted uuids themselves matter.
+    const shouldBlockMutation = (forUuids: (string | number)[]): boolean => {
+        if (pendingBlockScope === 'global') {
+            for (const _k in state.pendingFrameUuids) return true;
+            return false;
+        }
+        for (const u of forUuids) if (state.pendingFrameUuids[u]) return true;
+        return false;
+    };
+
+    // Brief visual cue when a drag/resize was blocked. Adds the attempted
+    // uuids to `loadingFrameUuids` so the pulse animation flashes on them
+    // for FLASH_DURATION_MS — telling the user "something's still saving,
+    // hands off." Resetting the timer on repeated attempts keeps the flash
+    // alive while the user keeps trying. The cleanup is gated on the uuid
+    // NOT being in pendingFrameUuids so we never accidentally clear an
+    // actually-pending frame's pulse.
+    const flashTimers: Record<string | number, ReturnType<typeof setTimeout>> = {};
+    const FLASH_DURATION_MS = 500;
+    const flashBlocked = (uuids: (string | number)[]) => {
+        for (const u of uuids) {
+            state.loadingFrameUuids[u] = true;
+            if (flashTimers[u]) clearTimeout(flashTimers[u]);
+            flashTimers[u] = setTimeout(() => {
+                delete flashTimers[u];
+                if (!state.pendingFrameUuids[u]) delete state.loadingFrameUuids[u];
+            }, FLASH_DURATION_MS);
+        }
+    };
+
+
     // Per-uuid timeout handles so repeated calls reset the blink window
     // instead of stacking (otherwise the class would clear prematurely if a
     // second call followed a first by less than the animation duration).
@@ -488,6 +616,17 @@ export const useTimeline = (
         enableEdgeScrolling,
         disableEdgeScrolling,
         scrollToViewPort,
+        setPending,
+        isPending,
+        setLoadingMode,
+        setLoadingDelay,
+        setLoadingMinShow,
+        getLoadingDelay,
+        getLoadingMinShow,
+        recordSaveDuration,
+        setPendingBlockScope,
+        shouldBlockMutation,
+        flashBlocked,
     };
 }
 

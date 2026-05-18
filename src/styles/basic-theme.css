@@ -180,6 +180,37 @@
     animation: vtd-highlight-blink 1.5s ease-in-out;
 }
 
+/* Processing = an async task registered via `frameData.process(...)` is in
+   flight (typically a server save). Drag/resize on this frame is blocked
+   at the composable level; the visual cue here is a top-right spinner +
+   slight fade. The spinner is a pseudo-element on the frame so the slot
+   content underneath stays untouched. Customise colour/size/position by
+   overriding `.vtd__frame-processing` (and its `::after`) in a downstream
+   theme. */
+@keyframes vtd-frame-processing-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+.vtd__frame-processing {
+    opacity: 0.65;
+    position: relative;
+}
+
+.vtd__frame-processing::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(0, 120, 215, 0.2);
+    border-top-color: rgb(0, 120, 215);
+    border-radius: 50%;
+    animation: vtd-frame-processing-spin 0.8s linear infinite;
+    pointer-events: none;
+}
+
 /* When selected, the frame foregrounds and forces full opacity so its
    text stays readable even on top of an overlapping sibling. The z-index
    has to live on the positioned container (the inner .vtd__row-frame is

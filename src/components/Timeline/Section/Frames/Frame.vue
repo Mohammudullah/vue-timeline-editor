@@ -81,6 +81,15 @@ const isHighlighted = computed(() =>
     props.timeline.state.highlightedFrameUuids[props.uuid] === true
 );
 
+// Drives the visual loading state (pulse + hidden resize handles).
+// Reads from `loadingFrameUuids` (not `pendingFrameUuids`) — the two are
+// intentionally separate: pending = race protection, applied immediately;
+// loading = visual cue, possibly delayed so fast saves don't flash. The
+// timeline composable manages the relationship.
+const isPending = computed(() =>
+    props.timeline.state.loadingFrameUuids[props.uuid] === true
+);
+
 // True when another frame in the SAME row shares any part of this frame's
 // time range. Surfaces the overlap state to the UI so a stacked frame can
 // render semi-transparent and not visually swallow what's underneath.
@@ -122,6 +131,7 @@ const isOverlapping = computed(() => {
         :linked-below="hasLinkedBelow"
         :overlapping="isOverlapping"
         :highlighted="isHighlighted"
+        :pending="isPending"
     >
         <!-- Re-expose the `frame` slot to consumers further up the tree. -->
         <template #frame="slotProps">

@@ -294,7 +294,9 @@ export const useSnapping = ({
             });
         });
 
-        return { initial, current, revert: buildRevert(initial) };
+        const revert = buildRevert(initial);
+        const process = buildProcess(initial, revert);
+        return { initial, current, revert, process };
     }
 
 
@@ -317,6 +319,66 @@ export const useSnapping = ({
                 sectionUuid: item.sectionUuid ?? original.sectionUuid,
             });
         }
+    };
+
+    // See dnd.ts:buildProcess. Same shape: pending immediate (race protect),
+    // loading delayed/immediate per `timeline.state.loadingMode`, minShow
+    // hold, recordSaveDuration for adaptive mode-switching, de-duped reentry.
+    const buildProcess = (initial: FrameDataItem[], revert: () => void) => {
+        const uuids = initial.map(it => it.uuid);
+        let inFlight: Promise<unknown> | null = null;
+
+        return <T,>(task: () => Promise<T>): Promise<T> => {
+            if (inFlight) return inFlight as Promise<T>;
+
+            uuids.forEach(u => timeline.setPending(u, true));
+
+            let delayTimer: ReturnType<typeof setTimeout> | null = null;
+            let loadingShownAt = 0;
+            const startedAt = Date.now();
+
+            const showLoading = () => {
+                if (loadingShownAt) return;
+                loadingShownAt = Date.now();
+                uuids.forEach(u => { timeline.state.loadingFrameUuids[u] = true; });
+            };
+
+            if (timeline.state.loadingMode === 'immediate') {
+                showLoading();
+            } else {
+                delayTimer = setTimeout(showLoading, timeline.getLoadingDelay());
+            }
+
+            const cleanupAfterSettle = async () => {
+                if (delayTimer != null) {
+                    clearTimeout(delayTimer);
+                    delayTimer = null;
+                }
+                uuids.forEach(u => timeline.setPending(u, false));
+                timeline.recordSaveDuration(Date.now() - startedAt);
+
+                if (loadingShownAt) {
+                    const remaining = timeline.getLoadingMinShow() - (Date.now() - loadingShownAt);
+                    if (remaining > 0) await new Promise(r => setTimeout(r, remaining));
+                    uuids.forEach(u => { delete timeline.state.loadingFrameUuids[u]; });
+                }
+            };
+
+            const run = async (): Promise<T> => {
+                try {
+                    return await task();
+                } catch (err) {
+                    revert();
+                    throw err;
+                } finally {
+                    inFlight = null;
+                    cleanupAfterSettle();
+                }
+            };
+
+            inFlight = run();
+            return inFlight as Promise<T>;
+        };
     };
 
 
@@ -360,7 +422,9 @@ export const useSnapping = ({
             });
         });
 
-        return { initial, current, revert: buildRevert(initial) };
+        const revert = buildRevert(initial);
+        const process = buildProcess(initial, revert);
+        return { initial, current, revert, process };
     }
 
 
