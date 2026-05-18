@@ -307,6 +307,16 @@ export const useTimeline = (
     }
 
 
+    // Recompute the empty-area cache for a single row. Snapping/overlap
+    // protection both read these, so any add/remove/move must refresh.
+    const refreshRowEmptyAreas = (rowUuid: string | number) => {
+        const row = state.sectionRowsByUuid[rowUuid];
+        if (!row) return;
+        const rangeEnd = config.range.end_seconds * 1000;
+        row.emptyAreas = getEmptyAreasOfRow(rowUuid, 0, rangeEnd);
+    };
+
+
     const updateFrame = (uuid: string | number, frame: TimelineFrameByUuidBasicInterface) => {
         // Capture the frame's previous row before re-registering, so we can
         // refresh empty areas for both old and new rows when the frame moves
@@ -315,20 +325,190 @@ export const useTimeline = (
 
         registerFrame(renderFrame(frame, frame.rowUuid, frame.sectionUuid), true);
 
-        // Recompute empty areas for affected rows. Without this, downstream
-        // snapping caches would keep using empty areas calculated from the
-        // frame's pre-update position, leading to wrong overlap/snap decisions
-        // when subsequent frames are dragged onto the same row.
-        const rangeEnd = config.range.end_seconds * 1000;
-        const refreshRow = (rowUuid: string | number) => {
-            const row = state.sectionRowsByUuid[rowUuid];
-            if (row) row.emptyAreas = getEmptyAreasOfRow(rowUuid, 0, rangeEnd);
-        };
-        refreshRow(frame.rowUuid);
+        refreshRowEmptyAreas(frame.rowUuid);
         if (previousRowUuid != null && previousRowUuid !== frame.rowUuid) {
-            refreshRow(previousRowUuid);
+            refreshRowEmptyAreas(previousRowUuid);
         }
     }
+
+
+    // Detach a frame from every map that references it. Internal — public
+    // surface is `removeFrame` (which also handles snapshot/revert/pending).
+    const deleteFrameInternal = (uuid: string | number) => {
+        const frame = state.sectionFramesByUuid[uuid];
+        if (!frame) return;
+        const rowUuid = frame.rowUuid;
+
+        delete state.sectionFramesByUuid[uuid];
+        if (state.sectionFrameUuids[rowUuid]) {
+            state.sectionFrameUuids[rowUuid] = state.sectionFrameUuids[rowUuid].filter(u => u !== uuid);
+        }
+
+        refreshRowEmptyAreas(rowUuid);
+
+        // Carry-over visual / interaction state — without this an aborted
+        // add could leave the uuid behind in pending/loading/blocked maps.
+        delete state.pendingFrameUuids[uuid];
+        delete state.loadingFrameUuids[uuid];
+        delete state.blockedFrameUuids[uuid];
+        delete state.attentionFrameUuids[uuid];
+        delete state.highlightedFrameUuids[uuid];
+    };
+
+
+    // Merge `patch` into the frame at `oldUuid`. When `patch.uuid` differs,
+    // swap the entry (remove old, register new). Pending state is carried
+    // across the swap so a still-in-flight add doesn't lose its block.
+    // Returns the uuid the frame is using AFTER the patch.
+    const applyPatch = (
+        oldUuid: string | number,
+        patch: Partial<TimelineFrameByUuidBasicInterface>,
+    ): string | number => {
+        const frame = state.sectionFramesByUuid[oldUuid];
+        if (!frame) return oldUuid;
+
+        const newUuid     = patch.uuid          ?? oldUuid;
+        const newRow      = patch.rowUuid       ?? frame.rowUuid;
+        const newSection  = patch.sectionUuid   ?? frame.sectionUuid;
+        const merged: TimelineFrameByUuidBasicInterface = {
+            uuid:          newUuid,
+            title:         patch.title         !== undefined ? patch.title         : frame.title,
+            start_ms:      patch.start_ms      !== undefined ? patch.start_ms      : frame.start_ms,
+            end_ms:        patch.end_ms        !== undefined ? patch.end_ms        : frame.end_ms,
+            rowUuid:       newRow,
+            sectionUuid:   newSection,
+            linkGroupUuid: patch.linkGroupUuid !== undefined ? patch.linkGroupUuid : frame.linkGroupUuid,
+            meta:          patch.meta          !== undefined ? patch.meta          : frame.meta,
+        };
+
+        if (newUuid === oldUuid) {
+            updateFrame(oldUuid, merged);
+            return oldUuid;
+        }
+
+        // uuid swap — preserve pending so the in-flight gesture-block stays
+        // intact for the brief tail of the operation. Other transient flags
+        // (loading/blocked/etc.) are intentionally NOT migrated; they belong
+        // to the temp identity and don't carry meaning under the new uuid.
+        const wasPending = state.pendingFrameUuids[oldUuid] === true;
+        deleteFrameInternal(oldUuid);
+        registerFrame(renderFrame(merged, newRow, newSection), false);
+        refreshRowEmptyAreas(newRow);
+        if (wasPending) state.pendingFrameUuids[newUuid] = true;
+        return newUuid;
+    };
+
+
+    /**
+     * Optimistically adds a frame and (optionally) syncs it with a server
+     * round-trip. If `syncFn` is provided, the timeline:
+     *   1. adds the frame to state immediately,
+     *   2. marks its uuid pending (global block kicks in),
+     *   3. awaits `syncFn(frame)`,
+     *   4. on resolve — merges any returned Partial (including uuid swap),
+     *   5. on reject  — removes the optimistic frame (auto-revert).
+     * Without `syncFn`, the frame is just added; no async lifecycle.
+     *
+     * The returned handle's `uuid` getter always reflects the current uuid
+     * (so reading it after a successful sync returns the server-assigned id,
+     * not the temp one).
+     */
+    const addFrame = (
+        frame: TimelineFrameByUuidBasicInterface,
+        syncFn?: AddFrameSyncFn,
+    ): AddFrameHandle => {
+        registerFrame(renderFrame(frame, frame.rowUuid, frame.sectionUuid), false);
+        refreshRowEmptyAreas(frame.rowUuid);
+
+        let currentUuid: string | number = frame.uuid;
+
+        const revert = () => {
+            deleteFrameInternal(currentUuid);
+        };
+
+        let promise: Promise<void> = Promise.resolve();
+        if (syncFn) {
+            state.pendingFrameUuids[currentUuid] = true;
+            promise = (async () => {
+                try {
+                    const patch = await syncFn(state.sectionFramesByUuid[currentUuid]);
+                    if (patch) currentUuid = applyPatch(currentUuid, patch);
+                } catch (err) {
+                    revert();
+                    throw err;
+                } finally {
+                    delete state.pendingFrameUuids[currentUuid];
+                }
+            })();
+        }
+
+        return {
+            get uuid() { return currentUuid; },
+            revert,
+            promise,
+        };
+    };
+
+
+    /**
+     * Removes a frame and (optionally) confirms with a server round-trip.
+     * If `confirmFn` is provided:
+     *   1. snapshots the frame for revert,
+     *   2. removes it from state immediately,
+     *   3. marks the uuid pending (global block applies — the frame is gone
+     *      from the DOM but the in-flight operation still gates everything),
+     *   4. awaits confirmFn,
+     *   5. on reject — re-adds the frame from snapshot,
+     *   6. on resolve — frame stays gone.
+     * Without `confirmFn`, the frame is removed synchronously; no rollback.
+     */
+    const removeFrame = (
+        uuid: string | number,
+        confirmFn?: () => Promise<unknown>,
+    ): RemoveFrameHandle => {
+        const frame = state.sectionFramesByUuid[uuid];
+        if (!frame) {
+            return { revert: () => {}, promise: Promise.resolve() };
+        }
+
+        const snapshot: TimelineFrameByUuidBasicInterface = {
+            uuid:          frame.uuid,
+            title:         frame.title,
+            start_ms:      frame.start_ms,
+            end_ms:        frame.end_ms,
+            rowUuid:       frame.rowUuid,
+            sectionUuid:   frame.sectionUuid,
+            linkGroupUuid: frame.linkGroupUuid,
+            meta:          frame.meta,
+        };
+
+        deleteFrameInternal(uuid);
+
+        const revert = () => {
+            if (state.sectionFramesByUuid[uuid]) return;
+            registerFrame(renderFrame(snapshot, snapshot.rowUuid, snapshot.sectionUuid), false);
+            refreshRowEmptyAreas(snapshot.rowUuid);
+        };
+
+        let promise: Promise<void> = Promise.resolve();
+        if (confirmFn) {
+            // Frame is gone from the DOM but the uuid sits in pending so
+            // global block + dragBlocked events fire while we wait.
+            state.pendingFrameUuids[uuid] = true;
+            promise = (async () => {
+                try {
+                    await confirmFn();
+                } catch (err) {
+                    revert();
+                    throw err;
+                } finally {
+                    delete state.pendingFrameUuids[uuid];
+                }
+            })();
+        }
+
+        return { revert, promise };
+    };
 
 
     const updatePointerPosition = (event: PointerEvent) => {
@@ -656,7 +836,36 @@ export const useTimeline = (
         setPendingBlockScope,
         shouldBlockMutation,
         signalBlocked,
+        addFrame,
+        removeFrame,
     };
 }
 
 export type UseTimelineInterface = ReturnType<typeof useTimeline>;
+
+/**
+ * Callback invoked by `addFrame` after the optimistic insert. Receives the
+ * frame as it sits in state. Anything returned (as a Partial) is merged
+ * back into the frame — including `uuid`, which triggers an internal swap
+ * so the consumer's optimistic temp id is replaced by the server-assigned
+ * one without losing the in-flight pending state.
+ */
+export type AddFrameSyncFn = (
+    optimisticFrame: TimelineFrameByUuidInterface,
+) => Promise<Partial<TimelineFrameByUuidBasicInterface> | void>;
+
+export interface AddFrameHandle {
+    /** Current uuid the frame is using — may change after `syncFn` resolves with a new uuid. */
+    readonly uuid: string | number,
+    /** Removes the frame regardless of pending state. */
+    revert: () => void,
+    /** Settles when `syncFn` settles. Resolves immediately if no `syncFn` was provided. */
+    promise: Promise<void>,
+}
+
+export interface RemoveFrameHandle {
+    /** Re-adds the removed frame from the snapshot taken at removal time. */
+    revert: () => void,
+    /** Settles when `confirmFn` settles. Resolves immediately if no `confirmFn` was provided. */
+    promise: Promise<void>,
+}

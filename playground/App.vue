@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { shallowRef } from 'vue';
 import Dnd from '../src/components/Features/Dnd.vue';
 import Resize from '../src/components/Features/Resize.vue';
 import Sections from '../src/components/Features/Sections.vue';
 import SnapGuideLines from '../src/components/Features/SnapGuideLines.vue';
 import Snapping from '../src/components/Features/Snapping.vue';
 import Timeline from '../src/components/Timeline.vue';
+import type { TimelineInitInterface } from '../src/components/Timeline.vue';
 import JoinRows from '../src/components/Features/JoinRows.vue';
 import PanScroll from '../src/components/Features/PanScroll.vue';
 import '../src/styles/basic-theme.css';
@@ -14,7 +16,7 @@ import '../src/styles/basic-theme.css';
 const SERVER_DELAY_MS = 1500;
 const SERVER_SHOULD_FAIL = false;
 
-const fakeServerSave = (payload: unknown) => new Promise((resolve, reject) => {
+const fakeServerSave = <T>(payload: T): Promise<T> => new Promise((resolve, reject) => {
     console.log('[fake server] saving:', payload);
     setTimeout(() => {
         if (SERVER_SHOULD_FAIL) {
@@ -26,12 +28,108 @@ const fakeServerSave = (payload: unknown) => new Promise((resolve, reject) => {
         }
     }, SERVER_DELAY_MS);
 });
+
+// Captured from <Timeline @init>. shallowRef so Vue doesn't try to deep-watch
+// the entire feature graph — we only need the reference itself to be reactive.
+const timelineApi = shallowRef<TimelineInitInterface | null>(null);
+
+const onInit = (api: TimelineInitInterface) => {
+    timelineApi.value = api;
+    console.log('Timeline ready. Try the buttons above the editor.');
+};
+
+// ─── Example 1 — optimistic add with server-side merge ───────────────────
+// Frame appears immediately in row2 with a temp uuid. The server "assigns"
+// a real uuid and the timeline swaps it in. If the server rejects, the
+// optimistic frame is automatically removed.
+let nextLocalId = 1;
+const addOptimistic = () => {
+    if (!timelineApi.value) return;
+    const tempUuid = `temp-${nextLocalId++}`;
+    const handle = timelineApi.value.timeline.addFrame(
+        {
+            uuid:        tempUuid,
+            title:       `Optimistic ${nextLocalId}`,
+            start_ms:    6 * 60 * 60 * 1000,
+            end_ms:      8 * 60 * 60 * 1000,
+            rowUuid:     'row2',
+            sectionUuid: 'section1',
+            meta:        { source: 'optimistic-add' },
+        },
+        async (frame) => {
+            // Pretend the server assigns a real id and snaps the time to
+            // the nearest 30 minutes.
+            const server = await fakeServerSave({
+                tempUuid: frame.uuid,
+                start_ms: frame.start_ms,
+                end_ms:   frame.end_ms,
+            });
+            return {
+                uuid:     `server-${Date.now()}`,
+                start_ms: server.start_ms,
+                end_ms:   server.end_ms,
+            };
+        },
+    );
+    handle.promise
+        .then(() => console.log('add → committed as', handle.uuid))
+        .catch(err => console.warn('add → reverted:', err.message));
+};
+
+// ─── Example 2 — pure local add (no server) ─────────────────────────────
+// CSV-import flavour: data is already trusted, just put it into state.
+const addLocal = () => {
+    if (!timelineApi.value) return;
+    timelineApi.value.timeline.addFrame({
+        uuid:        `local-${nextLocalId++}`,
+        title:       'Local',
+        start_ms:    8 * 60 * 60 * 1000,
+        end_ms:      9 * 60 * 60 * 1000,
+        rowUuid:     'row3',
+        sectionUuid: 'section1',
+    });
+};
+
+// ─── Example 3 — remove with server confirm + auto-revert ───────────────
+const removeConfirmed = (uuid: string) => {
+    if (!timelineApi.value) return;
+    const handle = timelineApi.value.timeline.removeFrame(uuid, () =>
+        fakeServerSave({ deleteUuid: uuid }),
+    );
+    handle.promise
+        .then(() => console.log('remove → confirmed'))
+        .catch(err => {
+            console.warn('remove → restored:', err.message);
+        });
+};
+
+// ─── Example 4 — pure local remove (no server) ──────────────────────────
+const removeLocal = (uuid: string) => {
+    timelineApi.value?.timeline.removeFrame(uuid);
+};
 </script>
 
 <template>
-    <div style="height: 100vh;">
-        <Timeline 
+    <div style="height: 100vh; display: flex; flex-direction: column;">
+        <!-- Example bar — demonstrates timeline.addFrame / removeFrame. -->
+        <div style="padding: 8px; display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid #ddd; font-size: 13px;">
+            <button @click="addOptimistic" :disabled="!timelineApi">
+                + Add (optimistic, server merge)
+            </button>
+            <button @click="addLocal" :disabled="!timelineApi">
+                + Add (pure local)
+            </button>
+            <button @click="removeConfirmed('frame1')" :disabled="!timelineApi">
+                − Remove 'frame1' (server confirm)
+            </button>
+            <button @click="removeLocal('frame2')" :disabled="!timelineApi">
+                − Remove 'frame2' (pure local)
+            </button>
+        </div>
+
+        <Timeline
             time-axis-time-format="hh:mm a"
+            @init="onInit"
         >
             <Sections
                 :sections="[{
