@@ -52,9 +52,22 @@ const useUtils = () => {
         return duration * pixelsPerSecond;
     }
 
+    // Converts an absolute ms time to its left-edge pixel offset inside the
+    // editor area. `range.start_seconds` is a HARD viewport: time `rangeStartMs`
+    // maps to `paddingLeft`; times before that produce negative offsets and
+    // clip off-screen left. Use this everywhere a placeholder, ghost, snap
+    // guide, or grid line needs to be positioned by ms.
+    const msToEditorLeft = (
+        ms: number,
+        rangeStartMs: number,
+        pixelPerMs: number,
+        paddingLeft: number,
+    ): number => ((ms - rangeStartMs) * pixelPerMs) + paddingLeft;
+
     return {
         secondsToTimeString,
         calculateFrameWidth,
+        msToEditorLeft,
     }
 }
 

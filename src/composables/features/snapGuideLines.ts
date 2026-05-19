@@ -33,6 +33,7 @@ export const useSnapGuideLines = ({
     watchEffect(() => {
         const majorInterval = timelineConfig.cols.majorGridInterval;
         const minorInterval = timelineConfig.cols.minorGridInterval;
+        const startMs = (timelineConfig.range.start_seconds ?? 0) * 1000;
         const endMs = (timelineConfig.range.end_seconds ?? 0) * 1000;
         const pixelPerMs = timelineConfig.cols.pixelPerMs;
         const paddingLeft = timelineConfig.editor.paddingLeft;
@@ -51,17 +52,20 @@ export const useSnapGuideLines = ({
         const majorPositions: { ms: number, left: number }[] = [];
         const minorPositions: { ms: number, left: number }[] = [];
 
-        if (endMs <= 0 || pixelPerMs <= 0) {
+        if (endMs <= startMs || pixelPerMs <= 0) {
             state.majorGridPositions = majorPositions;
             state.minorGridPositions = minorPositions;
             return;
         }
 
+        // Tick positions are in absolute ms; left offsets subtract `startMs`
+        // so they're relative to the viewport's left edge. Loop also starts
+        // at `startMs` — anything before is hard-clipped out of view.
         if (majorInterval > 0) {
-            for (let ms = 0; ms < endMs; ms += majorInterval) {
+            for (let ms = startMs; ms < endMs; ms += majorInterval) {
                 majorPositions.push({
                     ms,
-                    left: ms * pixelPerMs + paddingLeft,
+                    left: (ms - startMs) * pixelPerMs + paddingLeft,
                 });
             }
         }
@@ -69,12 +73,12 @@ export const useSnapGuideLines = ({
         // Minor positions exclude any position that coincides with a major tick,
         // so a consumer can render both layers without overlap.
         if (minorInterval > 0 && minorInterval < majorInterval) {
-            for (let ms = 0; ms < endMs; ms += minorInterval) {
-                if (majorInterval > 0 && ms % majorInterval === 0) continue;
+            for (let ms = startMs; ms < endMs; ms += minorInterval) {
+                if (majorInterval > 0 && (ms - startMs) % majorInterval === 0) continue;
 
                 minorPositions.push({
                     ms,
-                    left: ms * pixelPerMs + paddingLeft,
+                    left: (ms - startMs) * pixelPerMs + paddingLeft,
                 });
             }
         }

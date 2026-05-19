@@ -146,8 +146,14 @@ export const useTimeline = (
 
 
     const renderFrame = (frame: TimelineFrameByUuidBasicInterface | TimelineFrameByUuidInterface | TimelineFrameInterface, rowUuid: string | number, sectionUuid: string | number) => {
-        //calculate frame left and width which will help in hit pointer interactions
-        const frameLeft = (frame.start_ms * config.cols.pixelPerMs) + config.editor.paddingLeft;
+        // Frame `start_ms` stays absolute (so user data doesn't have to be
+        // re-based when start_seconds changes). The displayed pixel offset
+        // is relative to the viewport's left edge: time = start_seconds *
+        // 1000 → pixel = paddingLeft. Frames with start_ms < rangeStartMs
+        // land at negative editorRelativeLeft and clip off-screen left,
+        // which is the HARD viewport semantic we want.
+        const rangeStartMs = (config.range.start_seconds ?? 0) * 1000;
+        const frameLeft = ((frame.start_ms - rangeStartMs) * config.cols.pixelPerMs) + config.editor.paddingLeft;
         const width  = calculateFrameWidth(frame.start_ms, frame.end_ms, config.cols.pixelPerMs);
         
         return {
@@ -252,7 +258,7 @@ export const useTimeline = (
                     sectionUuid: section.uuid,
                     editorRelativeTop: rowTop,
                     editorRelativeBottom: rowBottom,
-                    emptyAreas: getEmptyAreasOfRow(row.uuid, 0, config.range.end_seconds * 1000),
+                    emptyAreas: getEmptyAreasOfRow(row.uuid, config.range.start_seconds * 1000, config.range.end_seconds * 1000),
                 }
 
                 state.sectionRowUuids[section.uuid].push(row.uuid);
@@ -312,8 +318,9 @@ export const useTimeline = (
     const refreshRowEmptyAreas = (rowUuid: string | number) => {
         const row = state.sectionRowsByUuid[rowUuid];
         if (!row) return;
+        const rangeStart = config.range.start_seconds * 1000;
         const rangeEnd = config.range.end_seconds * 1000;
-        row.emptyAreas = getEmptyAreasOfRow(rowUuid, 0, rangeEnd);
+        row.emptyAreas = getEmptyAreasOfRow(rowUuid, rangeStart, rangeEnd);
     };
 
 
@@ -533,9 +540,13 @@ export const useTimeline = (
         state.pointer.editorRelativeX = state.pointer.relativeX + scrollPaneEl.value.scrollLeft;
         state.pointer.editorRelativeY = state.pointer.relativeY + scrollPaneEl.value.scrollTop;
 
+        // Inverse of renderFrame's positioning: pixel x → absolute ms.
+        // Add `start_seconds * 1000` back so handlers downstream see the
+        // SAME ms domain as frame.start_ms / frame.end_ms.
         state.pointer.on_ms =
-            (state.pointer.editorRelativeX - config.editor.paddingLeft) /
-            config.cols.pixelPerMs;
+            ((state.pointer.editorRelativeX - config.editor.paddingLeft) /
+                config.cols.pixelPerMs)
+            + (config.range.start_seconds * 1000);
 
         setPointerOverRow(state.pointer.editorRelativeY);
     }

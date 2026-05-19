@@ -30,7 +30,14 @@ export const useResize = ({
 }) => {
 
     const draggingEvents = useDraggingEvents();
-    const { calculateFrameWidth } = useUtils();
+    const { calculateFrameWidth, msToEditorLeft } = useUtils();
+    // See snapping.ts for rationale — bound msToEditorLeft for this composable.
+    const msToLeft = (ms: number) => msToEditorLeft(
+        ms,
+        (timelineConfig.range.start_seconds ?? 0) * 1000,
+        timelineConfig.cols.pixelPerMs,
+        timelineConfig.editor.paddingLeft,
+    );
 
     /**
      * Deep, by-value snapshot of every selected frame at the moment the
@@ -369,7 +376,7 @@ export const useResize = ({
             );
         }
 
-        state.resizingPlaceholder.left = (state.resizingPlaceholder.start_ms * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
+        state.resizingPlaceholder.left = msToLeft(state.resizingPlaceholder.start_ms);
         state.resizingPlaceholder.width = calculateFrameWidth(
             state.resizingPlaceholder.start_ms,
             state.resizingPlaceholder.end_ms,

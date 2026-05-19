@@ -31,7 +31,16 @@ export const useSnapping = ({
     const resizing = computed(() => resize.value?.state.resizing || false);
     
     const draggingEvents = useDraggingEvents();
-    const { calculateFrameWidth } = useUtils();
+    const { calculateFrameWidth, msToEditorLeft } = useUtils();
+    // Bound helper: pass an absolute ms → get the pixel left inside the
+    // editor. Honours `range.start_seconds` (hard viewport offset). Reads
+    // timelineConfig every call so changes to range/zoom take effect.
+    const msToLeft = (ms: number) => msToEditorLeft(
+        ms,
+        (timelineConfig.range.start_seconds ?? 0) * 1000,
+        timelineConfig.cols.pixelPerMs,
+        timelineConfig.editor.paddingLeft,
+    );
 
     const activeRowCache = {
         emptyAreas: {
@@ -79,11 +88,14 @@ export const useSnapping = ({
 
         // Empty areas: sweep frames in time order and record the gaps. Mirrors
         // timeline.ts' getEmptyAreasOfRow but with the dragging frame removed.
+        // Sweep starts at `rangeStart` (hard viewport — space before that is
+        // not usable for placements).
         const sorted = [...framesInRow].sort((a, b) => a.start_ms - b.start_ms);
+        const rangeStart = timelineConfig.range.start_seconds * 1000;
         const rangeEnd = timelineConfig.range.end_seconds * 1000;
         const starts: number[] = [];
         const ends: number[] = [];
-        let cursor = 0;
+        let cursor = rangeStart;
         for (const frame of sorted) {
             if (frame.start_ms > cursor) {
                 starts.push(cursor);
@@ -511,14 +523,14 @@ export const useSnapping = ({
             // Record the snapped edge as an active guide.
             state.dragSnapGuides.push({
                 ms: result.value,
-                left: (result.value * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                left: msToLeft(result.value),
                 source: 'frame-edge',
             });
         }
 
-        return { 
-            top, 
-            left: (finalStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+        return {
+            top,
+            left: msToLeft(finalStart),
             startMs: finalStart,
             endMs: finalStart + duration,
         };
@@ -644,7 +656,7 @@ export const useSnapping = ({
                 // resizing from left, clamp startMs to the overlapping frame's end
                 const clampedStartMs = overlappingFrameEnd;
                 lastNotOverflowedPosition.top = top;
-                lastNotOverflowedPosition.left = (clampedStartMs * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
+                lastNotOverflowedPosition.left = msToLeft(clampedStartMs);
                 lastNotOverflowedPosition.startMs = clampedStartMs;
                 lastNotOverflowedPosition.endMs = endMs;
             }
@@ -702,10 +714,8 @@ export const useSnapping = ({
                     newEndMs = closestEdge + duration;
                 }
 
-                const newLeft = (newStartMs * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
-
                 lastNotOverflowedPosition.top = top;
-                lastNotOverflowedPosition.left = newLeft;
+                lastNotOverflowedPosition.left = msToLeft(newStartMs);
                 lastNotOverflowedPosition.startMs = newStartMs;
                 lastNotOverflowedPosition.endMs = newEndMs;
 
@@ -771,39 +781,36 @@ export const useSnapping = ({
         const distanceToMajorGridEnd = Math.abs(dependency.frame.end_ms - majorGridEnd);
 
         if(distanceToMajorGridStart <= majorGridIntervalThreshold) {
-            
+
             state.dragSnapGuides.push({
                 ms: majorGridStart,
-                left: (majorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                left: msToLeft(majorGridStart),
                 source: 'grid-major',
             });
 
-            const data = {
+            return {
                 top,
-                left: (majorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                left: msToLeft(majorGridStart),
                 startMs: majorGridStart,
                 endMs: majorGridStart + (dependency.frame.end_ms - dependency.frame.start_ms),
-            }
-
-            return data;
+            };
         }
 
 
         if(distanceToMajorGridEnd <= majorGridIntervalThreshold) {
             state.dragSnapGuides.push({
                 ms: majorGridEnd,
-                left: (majorGridEnd * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                left: msToLeft(majorGridEnd),
                 source: 'grid-major',
             });
 
-            const data = {
+            const newStart = majorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms);
+            return {
                 top,
-                left: ((majorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms)) * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
-                startMs: majorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms),
+                left: msToLeft(newStart),
+                startMs: newStart,
                 endMs: majorGridEnd,
-            }
-
-            return data;
+            };
         }
 
 
@@ -818,35 +825,32 @@ export const useSnapping = ({
         if(distanceToMinorGridStart <= minorGridIntervalThreshold) {
             state.dragSnapGuides.push({
                 ms: minorGridStart,
-                left: (minorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                left: msToLeft(minorGridStart),
                 source: 'grid-minor',
             });
 
-            const data = {
+            return {
                 top,
-                left: (minorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                left: msToLeft(minorGridStart),
                 startMs: minorGridStart,
                 endMs: minorGridStart + (dependency.frame.end_ms - dependency.frame.start_ms),
-            }
-
-            return data;
+            };
         }
 
         if(distanceToMinorGridEnd <= minorGridIntervalThreshold) {
             state.dragSnapGuides.push({
                 ms: minorGridEnd,
-                left: (minorGridEnd * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                left: msToLeft(minorGridEnd),
                 source: 'grid-minor',
             });
 
-            const data = {
+            const newStart = minorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms);
+            return {
                 top,
-                left: ((minorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms)) * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
-                startMs: minorGridEnd - (dependency.frame.end_ms - dependency.frame.start_ms),
+                left: msToLeft(newStart),
+                startMs: newStart,
                 endMs: minorGridEnd,
-            }
-
-            return data;
+            };
         }
 
 
@@ -899,7 +903,7 @@ export const useSnapping = ({
             if(distanceToMajorGridStart <= majorGridIntervalThreshold) {
                 return {
                     top,
-                    left: (majorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                    left: msToLeft(majorGridStart),
                     startMs: majorGridStart,
                     endMs,
                 }
@@ -911,7 +915,7 @@ export const useSnapping = ({
             if(distanceToMinorGridStart <= minorGridIntervalThreshold) {
                 return {
                     top,
-                    left: (minorGridStart * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                    left: msToLeft(minorGridStart),
                     startMs: minorGridStart,
                     endMs,
                 }
@@ -1097,7 +1101,7 @@ export const useSnapping = ({
                 uuid: sibling.uuid,
                 rowUuid: sibling.rowUuid,
                 top: memberRow?.editorRelativeTop ?? 0,
-                left: (validatedPrimary.start_ms * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft,
+                left: msToLeft(validatedPrimary.start_ms),
                 start_ms: validatedPrimary.start_ms,
                 end_ms: validatedPrimary.end_ms,
                 width: sibling.width,

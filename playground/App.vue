@@ -130,6 +130,10 @@ const removeLocal = (uuid: string) => {
         <Timeline
             time-axis-time-format="hh:mm a"
             @init="onInit"
+            :initial-range="{
+                start_seconds: 2610,
+                end_seconds: 3200
+            }"
         >
             <Sections
                 :sections="[{

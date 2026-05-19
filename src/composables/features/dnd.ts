@@ -4,6 +4,7 @@ import { TimelineConfigInterface } from "../timelineConfig";
 import { UseTimelineInterface } from "../timeline";
 import { UseFramesType } from "./frames";
 import { DraggedFrameDataInterface, FrameDataItem, useDraggingEvents } from "./draggingEvents";
+import useUtils from "../utils";
 
 /**
  * useDnd
@@ -30,6 +31,15 @@ export const useDnd = ({
     frames: UseFramesType,
     edgeSnap?: boolean,
 }) => {
+
+    const { msToEditorLeft } = useUtils();
+    // See snapping.ts for rationale — bound msToEditorLeft for this composable.
+    const msToLeft = (ms: number) => msToEditorLeft(
+        ms,
+        (timelineConfig.range.start_seconds ?? 0) * 1000,
+        timelineConfig.cols.pixelPerMs,
+        timelineConfig.editor.paddingLeft,
+    );
 
     const state = reactive<DndStateInterface>({
         dragging: false,
@@ -413,9 +423,11 @@ export const useDnd = ({
             else if (top > maxTop) top = maxTop;
         }
 
-        const start = left - timelineConfig.editor.paddingLeft;
-        const start_ms = start / timelineConfig.cols.pixelPerMs;
-        const end_ms = (start + state.draggingFrame.data.width) / timelineConfig.cols.pixelPerMs;
+        // Inverse of msToLeft — pixel x → absolute ms (adds `rangeStartMs`
+        // so the result lives in the same domain as frame.start_ms).
+        const rangeStartMs = (timelineConfig.range.start_seconds ?? 0) * 1000;
+        const start_ms = (left - timelineConfig.editor.paddingLeft) / timelineConfig.cols.pixelPerMs + rangeStartMs;
+        const end_ms = start_ms + state.draggingFrame.data.width / timelineConfig.cols.pixelPerMs;
 
         return { left, top, start_ms, end_ms };
     };
@@ -456,7 +468,7 @@ export const useDnd = ({
             const memberRow = timeline.state.sectionRowsByUuid[memberFrame.rowUuid];
             const m_start = memberFrame.start_ms + delta_ms;
             const m_end = memberFrame.end_ms + delta_ms;
-            const m_left = (m_start * timelineConfig.cols.pixelPerMs) + timelineConfig.editor.paddingLeft;
+            const m_left = msToLeft(m_start);
 
             state.draggingPlaceholders[uuid] = {
                 uuid,
