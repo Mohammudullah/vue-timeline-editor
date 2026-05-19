@@ -1,6 +1,6 @@
 {
     "name": "@mohammadullah/vue-timeline-editor",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "description": "Interactive timeline editor for Vue 3 (drag, resize, zoom)",
     "author": "Mohammadullah",
     "license": "MIT",
@@ -72,5 +72,13 @@
         "drag",
         "resize",
         "timeline-editor"
-    ]
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/Mohammudullah/vue-timeline-editor.git"
+    },
+    "homepage": "https://github.com/Mohammudullah/vue-timeline-editor#readme",
+    "bugs": {
+        "url": "https://github.com/Mohammudullah/vue-timeline-editor/issues"
+    }
 }
