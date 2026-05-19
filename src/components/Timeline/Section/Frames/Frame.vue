@@ -59,6 +59,32 @@ const hasLinkedAbove = computed(() => {
     );
 });
 
+// How many CONTIGUOUS linked siblings sit in rows directly above this frame
+// (same linkGroupUuid, same start/end times). Used to size the bottom-of-
+// group resize handle so its grip lands at the group's vertical centre
+// regardless of how many frames the group spans. Returns 0 when this frame
+// is the top of the group or not linked at all.
+const linkedAboveCount = computed(() => {
+    const f = frame.value;
+    if (!f?.linkGroupUuid) return 0;
+    const idx = rowUuids.value.indexOf(f.rowUuid);
+    if (idx <= 0) return 0;
+
+    let count = 0;
+    for (let i = idx - 1; i >= 0; i--) {
+        const aboveRowUuid = rowUuids.value[i];
+        const hasSibling = Object.values(props.timeline.state.sectionFramesByUuid).some(
+            fr => fr.rowUuid === aboveRowUuid
+                && fr.linkGroupUuid === f.linkGroupUuid
+                && fr.start_ms === f.start_ms
+                && fr.end_ms === f.end_ms
+        );
+        if (!hasSibling) break;
+        count++;
+    }
+    return count;
+});
+
 // Symmetric check for the row directly below.
 const hasLinkedBelow = computed(() => {
     const f = frame.value;
@@ -142,6 +168,7 @@ const isOverlapping = computed(() => {
         :show-resize-handle="props.selected && !props.dragging && props.resizable"
         :linked-above="hasLinkedAbove"
         :linked-below="hasLinkedBelow"
+        :linked-above-count="linkedAboveCount"
         :overlapping="isOverlapping"
         :highlighted="isHighlighted"
         :pending="isPending"

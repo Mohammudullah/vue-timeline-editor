@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import useUtils from '../../../composables/utils';
 
 
@@ -20,6 +20,11 @@ const props = withDefaults(defineProps<{
     // feels connected yet distinct.
     linkedAbove?: boolean,
     linkedBelow?: boolean,
+    // Number of contiguous linked siblings ABOVE this frame in the same
+    // group. Used by the bottom-of-group resize handle to scale its height
+    // and offset so the grip sits at the group's vertical centre regardless
+    // of group size (CSS only knows top/bottom flags, not the count).
+    linkedAboveCount?: number,
     // True when this frame's time range overlaps another frame's in the same
     // row. Triggers a semi-transparent style so the stacked frames are both
     // visible. Used when overlap protection is disabled.
@@ -46,6 +51,21 @@ const props = withDefaults(defineProps<{
 
 
 const { secondsToTimeString } = useUtils()
+
+// Bottom-of-group resize handle: scale its height and offset so the grip
+// lands at the vertical centre of the WHOLE joined group, not just between
+// this frame and one above. CSS only knows top/bottom flags; the group
+// size has to come from a count. Applied as inline style so it overrides
+// the basic-theme.css default (which hardcodes 200% / -50% — correct only
+// for a 2-frame group).
+const groupResizeHandleStyle = computed<Record<string, string>>(() => {
+    if (!props.linkedAbove || props.linkedBelow) return {} as Record<string, string>;
+    const n = props.linkedAboveCount ?? 1;
+    return {
+        height: `${(n + 1) * 100}%`,
+        transform: `translateY(${-n / (n + 1) * 100}%)`,
+    };
+});
 
 const container = ref<HTMLDivElement | null>(null);
 
@@ -110,6 +130,7 @@ const onClick = (event: PointerEvent) => {
                 'vtd__row-frame-resize-handle--linked-above': linkedAbove,
                 'vtd__row-frame-resize-handle--linked-below': linkedBelow,
             }"
+            :style="groupResizeHandleStyle"
             v-if="showResizeHandle && !pending"
         >
             <div class="vtd__row-frame-resize-handle-grip no-dragging"></div>
@@ -178,6 +199,7 @@ const onClick = (event: PointerEvent) => {
                 'vtd__row-frame-resize-handle--linked-above': linkedAbove,
                 'vtd__row-frame-resize-handle--linked-below': linkedBelow,
             }"
+            :style="groupResizeHandleStyle"
             v-if="showResizeHandle && !pending"
         >
             <div class="vtd__row-frame-resize-handle-grip no-dragging"></div>

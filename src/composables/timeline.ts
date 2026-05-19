@@ -518,6 +518,55 @@ export const useTimeline = (
     };
 
 
+    /**
+     * Upsert API: update if the uuid already exists, otherwise create.
+     * Returns `{ uuid, created }` so callers can branch on the outcome
+     * (e.g. log new arrivals, decide whether to select the new frame, etc.).
+     *
+     * Pure data merge — no `syncFn` / `process` / pending lifecycle. Use
+     * `addFrame` + `updateFrame` directly when you want the optimistic +
+     * server-confirm + auto-revert path; their semantics differ between
+     * create and update (revert means "remove" vs. "restore old values")
+     * so combining them in one method is more confusing than helpful.
+     */
+    const syncFrame = (frame: TimelineFrameByUuidBasicInterface): { uuid: string | number, created: boolean } => {
+        const exists = state.sectionFramesByUuid[frame.uuid] != null;
+        if (exists) {
+            updateFrame(frame.uuid, frame);
+        } else {
+            registerFrame(renderFrame(frame, frame.rowUuid, frame.sectionUuid), false);
+            refreshRowEmptyAreas(frame.rowUuid);
+        }
+        return { uuid: frame.uuid, created: !exists };
+    };
+
+    /**
+     * Bulk upsert. Dedupes empty-area refreshes per row so a 100-frame
+     * push only refreshes each affected row once. Returns one result entry
+     * per input frame, in order.
+     */
+    const syncFrames = (
+        frames: TimelineFrameByUuidBasicInterface[],
+    ): { uuid: string | number, created: boolean }[] => {
+        const touchedRows = new Set<string | number>();
+        const results: { uuid: string | number, created: boolean }[] = [];
+        for (const frame of frames) {
+            const exists = state.sectionFramesByUuid[frame.uuid] != null;
+            if (exists) {
+                // updateFrame already refreshes the (possibly two) affected
+                // rows on its own — don't redo that work in our bulk pass.
+                updateFrame(frame.uuid, frame);
+            } else {
+                registerFrame(renderFrame(frame, frame.rowUuid, frame.sectionUuid), false);
+                touchedRows.add(frame.rowUuid);
+            }
+            results.push({ uuid: frame.uuid, created: !exists });
+        }
+        for (const rowUuid of touchedRows) refreshRowEmptyAreas(rowUuid);
+        return results;
+    };
+
+
     const updatePointerPosition = (event: PointerEvent) => {
 
         if(!scrollPaneEl.value) return;
@@ -875,6 +924,8 @@ export const useTimeline = (
         signalBlocked,
         addFrame,
         removeFrame,
+        syncFrame,
+        syncFrames,
     };
 }
 
