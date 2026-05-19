@@ -815,7 +815,33 @@ export const useTimeline = (
         state.container = newContainer;
         state.editor = newEditor;
         state.scrollPaneEl = newScrollPaneEl;
-    }) 
+    })
+
+
+    // Re-render every frame's pixel data (`editorRelativeLeft` + `width`)
+    // when the viewport range or pixel scale changes. These values are baked
+    // at registration time — without this watch they'd stay anchored to the
+    // initial range / zoom and frames would visually misalign with the
+    // updated time axis. Empty areas also need a refresh because their
+    // `start_seconds` clip changes with the new range.
+    watch(
+        () => [config.range.start_seconds, config.range.end_seconds, config.cols.pixelPerMs],
+        () => {
+            for (const uuid in state.sectionFramesByUuid) {
+                const f = state.sectionFramesByUuid[uuid];
+                state.sectionFramesByUuid[uuid] = renderFrame(f, f.rowUuid, f.sectionUuid);
+            }
+            for (const rowUuid in state.sectionRowsByUuid) {
+                const row = state.sectionRowsByUuid[rowUuid];
+                if (!row) continue;
+                row.emptyAreas = getEmptyAreasOfRow(
+                    rowUuid,
+                    config.range.start_seconds * 1000,
+                    config.range.end_seconds * 1000,
+                );
+            }
+        },
+    );
 
 
     onMounted(() => {

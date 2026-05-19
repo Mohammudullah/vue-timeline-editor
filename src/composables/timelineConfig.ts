@@ -147,6 +147,14 @@ export const useTimelineConfig = (
 
         if(!data.container.width) return;
 
+        // Recompute totalPixels here — `calculateTimelineArea` only runs
+        // when the grid interval changes, so a range update after init would
+        // otherwise leave editor.width pinned to the day-1 value. This is
+        // the only writer of `totalPixels` after init.
+        data.cols.totalPixels = Math.trunc(
+            data.cols.pixelPerMs * ((data.range.end_seconds - data.range.start_seconds) * 1000),
+        );
+
         data.editor.width = data.cols.totalPixels + data.editor.paddingLeft + data.editor.paddingRight;
         data.editor.height = timelineEditor.value?.scrollHeight ?? data.container.height;
 
