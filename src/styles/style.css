@@ -105,6 +105,14 @@
     overflow: visible;
 }
 
+/* Hover hint for click-to-add on an empty row area. */
+.vtd__new-frame-suggestion {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
 /* ---- Playhead ---------------------------------------------------------
    Three teleported pieces, all positioned at the same editor-relative
    pixel X so they stay aligned across horizontal scroll:

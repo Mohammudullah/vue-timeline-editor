@@ -115,6 +115,26 @@ const removeConfirmed = (uuid: string) => {
 const removeLocal = (uuid: string) => {
     timelineApi.value?.timeline.removeFrame(uuid);
 };
+
+// ─── Example 5 — click an empty row area to add a frame ─────────────────
+// <Sections> emits `add-frame` with the suggested range; the host owns
+// uuid / title / sync, so just push it into the timeline here.
+let addedFrameId = 1;
+const onAddFrame = (suggestion: {
+    rowUuid: string | number,
+    sectionUuid: string | number,
+    start_ms: number,
+    end_ms: number,
+}) => {
+    timelineApi.value?.timeline.addFrame({
+        uuid: `added-${addedFrameId++}`,
+        title: 'New Frame',
+        start_ms: suggestion.start_ms,
+        end_ms: suggestion.end_ms,
+        rowUuid: suggestion.rowUuid,
+        sectionUuid: suggestion.sectionUuid,
+    });
+};
 </script>
 
 <template>
@@ -157,6 +177,8 @@ const removeLocal = (uuid: string) => {
             }"
         >
             <Sections
+                row-clickable
+                @add-frame="onAddFrame"
                 :sections="[{
                     title: 'Section 1',
                     uuid: 'section1',
@@ -194,6 +216,9 @@ const removeLocal = (uuid: string) => {
                         {
                             uuid: 'row3',
                             title: 'Row 3',
+                            // Fixed-length suggestion: hovering an empty area
+                            // proposes a 30-minute frame (capped by the gap).
+                            new_frame_length: 30 * 60 * 1000,
                             frames: [{
                                 uuid: 'frame3',
                                 title: 'Frame 3',

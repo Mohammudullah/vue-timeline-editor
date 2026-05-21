@@ -44,6 +44,12 @@
     z-index: 4;
 }
 
+.vtd__new-frame-suggestion {
+    border: 2px dashed rgba(0, 120, 215, 0.55);
+    background-color: rgba(0, 120, 215, 0.08);
+    border-radius: 6px;
+}
+
 /**------------ Section Styles End ---------------**/
 
 

@@ -18,7 +18,12 @@ export interface TimelineSectionInterface {
 export interface TimelineRowInterface {
     uuid: string | number,
     title: string,
-    frames: TimelineFrameInterface[]
+    frames: TimelineFrameInterface[],
+    // Optional. When set, hovering an empty area of this row suggests a
+    // new-frame box of this length (ms), capped by the available space.
+    // When omitted, the row still suggests the full empty area if the
+    // `<Sections rowClickable>` prop is enabled.
+    new_frame_length?: number,
 }
 
 export interface TimelineFrameInterface {
