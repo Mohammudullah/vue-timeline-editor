@@ -37,8 +37,9 @@
     font-size: .75rem;
     font-weight: 500;
     background-color: rgb(246, 246, 248);
-    position: static;
+    position: sticky;
     top: 0;
+    z-index: 2;
 }
 
 /**------------ Section Styles End ---------------**/
