@@ -70,17 +70,29 @@ export const usePlayhead = ({
         + timelineConfig.editor.paddingLeft,
     );
 
-    // null when the playhead is inside the horizontal viewport; otherwise the
-    // side it has scrolled off — drives the edge indicator.
+    // Which side the playhead has gone off — drives the edge indicator.
+    // Out of the timeline RANGE wins (the playhead is hidden then); otherwise
+    // it reflects whether the playhead is merely scrolled out of view.
     const edgeSide = computed<'left' | 'right' | null>(() => {
+        if (state.currentMs < rangeStartMs()) return 'left';
+        if (state.currentMs > rangeEndMs()) return 'right';
         if (viewport.width === 0) return null;
         if (pixelX.value < viewport.scrollLeft) return 'left';
         if (pixelX.value > viewport.scrollLeft + viewport.width) return 'right';
         return null;
     });
 
+    // True while the playhead sits within the timeline range. The line and
+    // handle are hidden when false — the edge arrow points toward it instead.
+    const inRange = computed(() =>
+        state.currentMs >= rangeStartMs() && state.currentMs <= rangeEndMs(),
+    );
+
+    // Set the playhead position. NOT clamped — an out-of-range position is a
+    // valid state (the playhead hides; an edge arrow points toward it).
+    // Pointer gestures go through `seekFromClientX`, which clamps instead.
     const seek = (ms: number) => {
-        state.currentMs = clamp(ms);
+        state.currentMs = ms;
     };
 
     // Convert a viewport clientX into an absolute-ms position. The scroll
@@ -95,7 +107,11 @@ export const usePlayhead = ({
             / timelineConfig.cols.pixelPerMs) + rangeStartMs();
     };
 
-    const seekFromClientX = (clientX: number) => seek(clientXToMs(clientX));
+    // Pointer-driven seek (drag / ruler click). Clamped to the range so a
+    // drag can't push the handle out of view mid-gesture.
+    const seekFromClientX = (clientX: number) => {
+        state.currentMs = clamp(clientXToMs(clientX));
+    };
 
     // Scroll the pane so the playhead is centred in the viewport. Defaults
     // to a smooth scroll; pass 'auto' for an instant jump (e.g. on mount).
@@ -166,12 +182,6 @@ export const usePlayhead = ({
     // Container resize changes the viewport width — refresh the mirror.
     watch(() => timelineConfig.container.width, syncViewport);
 
-    // A range change can leave `currentMs` outside the new bounds.
-    watch(
-        () => [timelineConfig.range.start_seconds, timelineConfig.range.end_seconds],
-        () => { state.currentMs = clamp(state.currentMs); },
-    );
-
     onBeforeUnmount(() => {
         pause();
         timeline.state.scrollPaneEl?.removeEventListener('scroll', syncViewport);
@@ -180,7 +190,7 @@ export const usePlayhead = ({
     // Derived values are grouped into a `reactive` object so the feature's
     // public surface has no top-level refs — the feature registry is itself
     // `reactive`, and loose refs would be unwrapped inconsistently there.
-    const view = reactive({ pixelX, edgeSide });
+    const view = reactive({ pixelX, edgeSide, inRange });
 
     return {
         state,

@@ -170,6 +170,7 @@ onUnmounted(() => {
                 @pointercancel="onScrubEnd"
             />
             <div
+                v-if="playhead.view.inRange"
                 class="vtd__playhead-handle"
                 :class="{ 'vtd__playhead-handle--inert': !playhead.options.draggable }"
                 :style="{ left: playhead.view.pixelX + 'px' }"
@@ -180,9 +181,11 @@ onUnmounted(() => {
             />
         </Teleport>
 
-        <!-- Vertical line — spans the full editor content height. -->
+        <!-- Vertical line — spans the full editor content height. Hidden
+             when the playhead is outside the range (edge arrow shows). -->
         <Teleport to="#editorAreaTeleports" defer>
             <div
+                v-if="playhead.view.inRange"
                 class="vtd__playhead-line"
                 :style="{ left: playhead.view.pixelX + 'px' }"
             />

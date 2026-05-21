@@ -126,6 +126,9 @@
     right: 0;
     pointer-events: none;
     overflow: hidden;
+    /* Above the sticky section header (z-index 4) and playhead line
+       (z-index 5) so the edge arrow is never obscured by them. */
+    z-index: 6;
 }
 
 .vtd__playhead-line {
