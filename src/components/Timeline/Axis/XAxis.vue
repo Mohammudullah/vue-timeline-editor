@@ -18,9 +18,11 @@ const props = withDefaults(defineProps<{
         height: config.cols.labelHeight + 'px',
         width: config.editor.width + 'px',
     }">
-        <TimeAxis 
+        <TimeAxis
             :config="config"
             :timeline="timeline"
         />
+
+        <div id="xAxisTeleports" class="vtd__x-axis-teleports"></div>
     </div>
 </template>

@@ -42,6 +42,7 @@
     display: flex;
     min-height: 0;
     flex: 1;
+    position: relative;
 }
 
 .vtd__timeline-y-axis-pane {
@@ -53,6 +54,7 @@
     overflow: hidden;
     flex-shrink: 0;
     display: flex;
+    position: relative;
 }
 
 .vtd__x-axis-y-axis-spacing {
@@ -101,4 +103,68 @@
     position: absolute;
     /* Allow resize handles to protrude outside the container bounds */
     overflow: visible;
+}
+
+/* ---- Playhead ---------------------------------------------------------
+   Three teleported pieces, all positioned at the same editor-relative
+   pixel X so they stay aligned across horizontal scroll:
+     - line   → editor area (native scroll)
+     - handle + seek strip → X-axis (scroll-mirrored via transform)
+     - edge indicator → viewport overlay (does not scroll)
+------------------------------------------------------------------------ */
+.vtd__x-axis-teleports {
+    position: absolute;
+    inset: 0;
+    /* Children opt back in; the container itself must not eat ruler events. */
+    pointer-events: none;
+}
+
+.vtd__editor-viewport-teleports {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.vtd__playhead-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.vtd__playhead-seek-strip {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+}
+
+.vtd__playhead-handle {
+    position: absolute;
+    /* Span the full ruler height so the stem reaches the editor-area line
+       regardless of the configured label height. */
+    top: 0;
+    bottom: 0;
+    /* `left` is the editor pixel X; shift so the tip is centred on it. */
+    transform: translateX(-50%);
+    pointer-events: auto;
+    z-index: 1;
+}
+
+/* Drag disabled — the handle is purely visual; clicks fall through to the
+   seek strip and no drag cursor is shown. */
+.vtd__playhead-handle--inert {
+    pointer-events: none;
+}
+
+.vtd__playhead-edge-indicator {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: auto;
+    cursor: pointer;
 }

@@ -41,6 +41,10 @@ export default defineConfig(({ command }) => ({
                 replacement: path.resolve(__dirname, 'dist/features/resize.js')
             },
             {
+                find: 'vue-timeline-editor/features/playhead',
+                replacement: path.resolve(__dirname, 'dist/features/playhead.js')
+            },
+            {
                 find: 'vue-timeline-editor/timeline',
                 replacement: path.resolve(__dirname, 'dist/timeline.js')
             },
@@ -64,6 +68,7 @@ export default defineConfig(({ command }) => ({
                 'features/snapping': 'src/features/snapping.ts',
                 'features/sections': 'src/features/sections.ts',
                 'features/resize': 'src/features/resize.ts',
+                'features/playhead': 'src/features/playhead.ts',
             },
             name: 'VueTimelineEditor',
         },

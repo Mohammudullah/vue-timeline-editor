@@ -45,6 +45,71 @@
 /**------------ Section Styles End ---------------**/
 
 
+/**------------ Playhead Styles Start ---------------**/
+
+.vtd__playhead-line {
+    border-left: 1px solid rgb(229, 57, 53);
+}
+
+.vtd__playhead-handle {
+    width: 14px;
+    cursor: ew-resize;
+}
+
+/* Downward-pointing triangle so the tip marks the exact position. The
+   +0.5px centres the tip on the 1px line column, not its left edge. */
+.vtd__playhead-handle::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(calc(-50% + 0.5px));
+    width: 14px;
+    height: 14px;
+    background-color: rgb(229, 57, 53);
+    border-radius: 1px;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+/* Stem bridging the triangle down to the editor-area line, so the playhead
+   reads as one continuous mark through the ruler. Drawn as a border (not a
+   background) so it shares the exact pixel column as the editor-area line
+   and stays crisp instead of fading on sub-pixel positions. */
+.vtd__playhead-handle::after {
+    content: "";
+    position: absolute;
+    top: 14px;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    border-left: 1px solid rgb(229, 57, 53);
+}
+
+.vtd__playhead-seek-strip {
+    cursor: pointer;
+}
+
+.vtd__playhead-edge-indicator {
+    width: 0;
+    height: 0;
+    border-top: 7px solid transparent;
+    border-bottom: 7px solid transparent;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+
+.vtd__playhead-edge-indicator--left {
+    left: 6px;
+    border-right: 10px solid rgba(229, 56, 53, 0.589);
+}
+
+.vtd__playhead-edge-indicator--right {
+    right: 6px;
+    border-left: 10px solid rgba(229, 56, 53, 0.678);
+}
+
+/**------------ Playhead Styles End ---------------**/
+
+
 /**------------ Time Axis Styles Start ---------------**/
 
 .vtd__time-axis {

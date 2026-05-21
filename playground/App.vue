@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { shallowRef } from 'vue';
+import { ref, shallowRef } from 'vue';
 import Dnd from '../src/components/Features/Dnd.vue';
 import Resize from '../src/components/Features/Resize.vue';
 import Sections from '../src/components/Features/Sections.vue';
@@ -9,6 +9,7 @@ import Timeline from '../src/components/Timeline.vue';
 import type { TimelineInitInterface } from '../src/components/Timeline.vue';
 import JoinRows from '../src/components/Features/JoinRows.vue';
 import PanScroll from '../src/components/Features/PanScroll.vue';
+import Playhead from '../src/components/Features/Playhead.vue';
 import '../src/styles/basic-theme.css';
 
 // Fake server: resolves after `ms` if `shouldFail` is false; rejects otherwise.
@@ -32,6 +33,13 @@ const fakeServerSave = <T>(payload: T): Promise<T> => new Promise((resolve, reje
 // Captured from <Timeline @init>. shallowRef so Vue doesn't try to deep-watch
 // the entire feature graph — we only need the reference itself to be reactive.
 const timelineApi = shallowRef<TimelineInitInterface | null>(null);
+
+// ─── Playhead — props/v-model control ───────────────────────────────────
+// Position (absolute ms) and playback state are two-way bound to <Playhead>.
+// The same playhead can also be driven imperatively via
+// timelineApi.value.features.data.playhead.
+const playheadMs = ref(2610 * 1000);
+const playheadPlaying = ref(false);
 
 const onInit = (api: TimelineInitInterface) => {
     timelineApi.value = api;
@@ -125,6 +133,18 @@ const removeLocal = (uuid: string) => {
             <button @click="removeLocal('frame2')" :disabled="!timelineApi">
                 − Remove 'frame2' (pure local)
             </button>
+            <button @click="playheadPlaying = !playheadPlaying" :disabled="!timelineApi">
+                {{ playheadPlaying ? '⏸ Pause' : '▶ Play' }} playhead
+            </button>
+            <button
+                @click="timelineApi?.features.data.playhead?.scrollIntoView()"
+                :disabled="!timelineApi"
+            >
+                ⌖ Scroll to playhead
+            </button>
+            <span style="align-self: center; color: #666;">
+                playhead: {{ (playheadMs / 1000).toFixed(1) }}s
+            </span>
         </div>
 
         <Timeline
@@ -392,6 +412,12 @@ const removeLocal = (uuid: string) => {
             <SnapGuideLines/>
             <JoinRows/>
             <PanScroll/>
+            <Playhead
+                v-model="playheadMs"
+                v-model:playing="playheadPlaying"
+                :rate="60"
+                loop
+            />
         </Timeline>
     </div>
 </template>

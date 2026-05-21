@@ -34,6 +34,11 @@
             "require": "./dist/features/sections.cjs",
             "types": "./dist/features/sections.d.ts"
         },
+        "./features/playhead": {
+            "import": "./dist/features/playhead.js",
+            "require": "./dist/features/playhead.cjs",
+            "types": "./dist/features/playhead.d.ts"
+        },
         "./basic-theme.css": "./dist/basic-theme.css"
     },
     "files": [

@@ -164,6 +164,14 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div
+                    id="editorViewportTeleports"
+                    class="vtd__editor-viewport-teleports"
+                    :style="{
+                        left: timelineConfig.rows.labelWidth + 'px'
+                    }"
+                ></div>
+
+                <div
                     class="vtd__wrapper"
                     @scroll="onTimelineScroll"
                     ref="scrollPaneEl"

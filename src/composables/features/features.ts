@@ -8,13 +8,15 @@ import { UseResizeInterface } from "./resize";
 import { UseSnapGuideLinesType } from "./snapGuideLines";
 import { UseJoinRowsType } from "./joinRows";
 import { UsePanScrollType } from "./panScroll";
+import { UsePlayheadType } from "./playhead";
 
 /**
  * useFeatures
  *
  * Feature registry. Always-on features (`frames`) are created up-front;
- * opt-in features (`dnd`, `snapping`, `resize`, `joinRows`, `snapGuideLines`)
- * are registered when their corresponding `<Feature/>` component mounts.
+ * opt-in features (`dnd`, `snapping`, `resize`, `joinRows`, `snapGuideLines`,
+ * `panScroll`, `playhead`) are registered when their corresponding
+ * `<Feature/>` component mounts.
  */
 export const useFeatures = ({
     timeline,
@@ -34,6 +36,7 @@ export const useFeatures = ({
         snapGuideLines: null,
         joinRows: null,
         panScroll: null,
+        playhead: null,
         frames,
     });
 
@@ -48,6 +51,7 @@ export const useFeatures = ({
         else if (feature === 'snapGuideLines') features.snapGuideLines = value() as UseSnapGuideLinesType;
         else if (feature === 'joinRows') features.joinRows = value() as UseJoinRowsType;
         else if (feature === 'panScroll') features.panScroll = value() as UsePanScrollType;
+        else if (feature === 'playhead') features.playhead = value() as UsePlayheadType;
     };
 
     const destroyFeature = (feature: keyof FeaturesInterface): void => {
@@ -59,6 +63,7 @@ export const useFeatures = ({
         else if (feature === 'snapGuideLines') features.snapGuideLines = null;
         else if (feature === 'joinRows') features.joinRows = null;
         else if (feature === 'panScroll') features.panScroll = null;
+        else if (feature === 'playhead') features.playhead = null;
     };
 
     return {
@@ -76,8 +81,9 @@ export interface FeaturesInterface {
     snapGuideLines: UseSnapGuideLinesType | null,
     joinRows: UseJoinRowsType | null,
     panScroll: UsePanScrollType | null,
+    playhead: UsePlayheadType | null,
 }
 
 export type UseFeaturesType = ReturnType<typeof useFeatures>;
 
-export type InitFeatureType = UseDndType | UseSnappingInterface | UseFramesType | UseResizeInterface | UseSnapGuideLinesType | UseJoinRowsType | UsePanScrollType;
+export type InitFeatureType = UseDndType | UseSnappingInterface | UseFramesType | UseResizeInterface | UseSnapGuideLinesType | UseJoinRowsType | UsePanScrollType | UsePlayheadType;
