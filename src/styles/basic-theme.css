@@ -50,6 +50,15 @@
     border-radius: 6px;
 }
 
+.vtd__new-frame-suggestion-label {
+    font-size: .7rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 999px;
+    color: white;
+    background-color: rgb(0, 120, 215);
+}
+
 /**------------ Section Styles End ---------------**/
 
 

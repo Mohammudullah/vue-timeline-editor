@@ -23,7 +23,7 @@ export interface TimelineRowInterface {
     // new-frame box of this length (ms), capped by the available space.
     // When omitted, the row still suggests the full empty area if the
     // `<Sections rowClickable>` prop is enabled.
-    new_frame_length?: number,
+    new_frame_ms?: number,
 }
 
 export interface TimelineFrameInterface {
@@ -77,4 +77,6 @@ export interface TimelineRowByUuidInterface {
     editorRelativeTop: number,
     editorRelativeBottom: number,
     emptyAreas: { start_ms: number; end_ms: number }[],
+    // Carried from TimelineRowInterface — see its `new_frame_ms` doc.
+    new_frame_ms?: number,
 }

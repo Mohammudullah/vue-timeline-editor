@@ -1230,6 +1230,27 @@ export const useSnapping = ({
         }
     }
 
+    // Snap an absolute ms to the nearest grid line when within the snap
+    // threshold. Exposed for snapping OUTSIDE the drag/resize pipelines —
+    // e.g. the <Sections/> new-frame suggestion box. Returns ms unchanged
+    // when no grid line is close enough. Mirrors the major→minor priority
+    // and threshold used by snapTimesOnDrag.
+    const snapMs = (ms: number): number => {
+        const threshold = 15 * 60 * 1000;
+        const major = timelineConfig.cols.majorGridInterval;
+        const minor = timelineConfig.cols.minorGridInterval;
+
+        if (major > 0) {
+            const g = Math.round(ms / major) * major;
+            if (Math.abs(ms - g) <= threshold) return g;
+        }
+        if (minor > 0) {
+            const g = Math.round(ms / minor) * minor;
+            if (Math.abs(ms - g) <= threshold) return g;
+        }
+        return ms;
+    };
+
     watch([() => timeline.state.pointer.clientX, () => timeline.state.pointer.clientY, () => dnd.value?.state.dragging], snapOnDragPipeline, { deep: true });
     watch([() => timeline.state.pointer.clientX, () => resize.value?.state.resizing], snapOnResizePipeline, { deep: true });
 
@@ -1318,6 +1339,7 @@ export const useSnapping = ({
 
     return {
         state,
+        snapMs,
         onDragStart: draggingEvents.onDragStart,
         onDragEnd: draggingEvents.onDragEnd,
         onDragCancel: draggingEvents.onDragCancel,

@@ -111,6 +111,19 @@
     box-sizing: border-box;
     pointer-events: auto;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.vtd__new-frame-suggestion-label {
+    /* Clicks fall through to the box, which owns the @click handler. */
+    pointer-events: none;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ---- Playhead ---------------------------------------------------------

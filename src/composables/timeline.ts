@@ -259,6 +259,7 @@ export const useTimeline = (
                     editorRelativeTop: rowTop,
                     editorRelativeBottom: rowBottom,
                     emptyAreas: getEmptyAreasOfRow(row.uuid, config.range.start_seconds * 1000, config.range.end_seconds * 1000),
+                    new_frame_ms: row.new_frame_ms,
                 }
 
                 state.sectionRowUuids[section.uuid].push(row.uuid);

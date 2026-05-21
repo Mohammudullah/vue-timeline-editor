@@ -126,6 +126,13 @@ const onAddFrame = (suggestion: {
     start_ms: number,
     end_ms: number,
 }) => {
+    console.log('[add-frame] suggestion received:', {
+        rowUuid: suggestion.rowUuid,
+        sectionUuid: suggestion.sectionUuid,
+        start_ms: suggestion.start_ms,
+        end_ms: suggestion.end_ms,
+        length_ms: suggestion.end_ms - suggestion.start_ms,
+    });
     timelineApi.value?.timeline.addFrame({
         uuid: `added-${addedFrameId++}`,
         title: 'New Frame',
@@ -173,7 +180,7 @@ const onAddFrame = (suggestion: {
             @frame-hold="(frame) => console.log('frame held:', frame.uuid, frame.title)"
             :initial-range="{
                 start_seconds: 2610,
-                end_seconds: 3200
+                end_seconds: 2610 + 1000 * 60,
             }"
         >
             <Sections
@@ -217,8 +224,10 @@ const onAddFrame = (suggestion: {
                             uuid: 'row3',
                             title: 'Row 3',
                             // Fixed-length suggestion: hovering an empty area
-                            // proposes a 30-minute frame (capped by the gap).
-                            new_frame_length: 30 * 60 * 1000,
+                            // proposes a 2-minute frame (capped by the gap).
+                            // Kept well under the ~9.8-min timeline range so
+                            // the box is visibly shorter than the full row.
+                            new_frame_ms: 50 * 60 * 1000,
                             frames: [{
                                 uuid: 'frame3',
                                 title: 'Frame 3',
@@ -414,7 +423,12 @@ const onAddFrame = (suggestion: {
                         }
                     ]
                 }]"
-            />
+            >
+                <!-- Touch-mode label override — shows the proposed length. -->
+                <template #label="{ length_ms }">
+                    + {{ Math.round(length_ms / 60000) }} min
+                </template>
+            </Sections>
             <Dnd/>
             <Snapping
                 @drop="(_frames, frameData) => {
