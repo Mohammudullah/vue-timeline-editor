@@ -39,7 +39,9 @@
     background-color: rgb(246, 246, 248);
     position: sticky;
     top: 0;
-    z-index: 2;
+    /* Above selected frames (z-index 3) so a selected frame scrolling past
+       the sticky header tucks underneath it instead of covering it. */
+    z-index: 4;
 }
 
 /**------------ Section Styles End ---------------**/

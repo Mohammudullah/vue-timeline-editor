@@ -15,7 +15,9 @@ const props = withDefaults(defineProps<{
 })
 
 const frameClick = (event : PointerEvent, frame: TimelineFrameByUuidInterface, container: HTMLDivElement, uuid: string | number) => {
-    props.features.data.frames.toggleFrame(event, frame, container, uuid)
+    // Always select — clicking an already-selected frame keeps it selected.
+    // Deselection happens on an outside click or by selecting another frame.
+    props.features.data.frames.selectFrame(event, frame, container, uuid)
 }
 
 const frameContainerUpdate = (container: HTMLDivElement | null, frame: TimelineFrameByUuidInterface, uuid: string | number) => {

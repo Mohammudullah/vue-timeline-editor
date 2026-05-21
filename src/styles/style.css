@@ -134,7 +134,9 @@
     bottom: 0;
     width: 0;
     pointer-events: none;
-    z-index: 4;
+    /* Above the sticky section header (z-index 4) so the line stays
+       continuous instead of breaking where a header sticks. */
+    z-index: 5;
 }
 
 .vtd__playhead-seek-strip {

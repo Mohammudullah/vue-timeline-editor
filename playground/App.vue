@@ -150,6 +150,7 @@ const removeLocal = (uuid: string) => {
         <Timeline
             time-axis-time-format="hh:mm a"
             @init="onInit"
+            @frame-hold="(frame) => console.log('frame held:', frame.uuid, frame.title)"
             :initial-range="{
                 start_seconds: 2610,
                 end_seconds: 3200
