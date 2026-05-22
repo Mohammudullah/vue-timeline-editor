@@ -126,6 +126,34 @@
     text-overflow: ellipsis;
 }
 
+/* Allowlist (slot-picking) mode — dim + lock the editor, keep allowed
+   slots clear and clickable. Layered well above frames/labels/playhead. */
+.vtd__allowlist-lock {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Eats pointer events so the dimmed area can't be interacted with. */
+    pointer-events: auto;
+    z-index: 10;
+}
+
+.vtd__allowlist-mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Purely visual — events pass through to the lock / slot layers. */
+    pointer-events: none;
+    z-index: 11;
+}
+
+.vtd__allowlist-slot {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 12;
+}
+
 /* ---- Playhead ---------------------------------------------------------
    Three teleported pieces, all positioned at the same editor-relative
    pixel X so they stay aligned across horizontal scroll:

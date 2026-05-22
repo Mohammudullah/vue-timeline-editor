@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { TimelineRowByUuidInterface, TimelineSectionByUuidInterface, TimelineSectionInterface } from '../../../../types/timeline';
+import { computed, inject } from 'vue';
+import type { Slots } from 'vue';
+import { TimelineRowByUuidInterface, TimelineSectionByUuidInterface } from '../../../../types/timeline';
 import { UseTimelineInterface } from '../../../../composables/timeline';
 import { TimelineConfigInterface } from '../../../../composables/timelineConfig';
 
@@ -11,8 +12,15 @@ const props = withDefaults(defineProps<{
     timeline: UseTimelineInterface,
     config: TimelineConfigInterface
 }>(), {
-    
+
 })
+
+// Slots passed to <Timeline>. The `rowLabel` slot lets consumers fully
+// replace a row's label. It re-renders reactively when state the consumer's
+// slot template closes over changes — only `uuid` needs to come from here.
+const timelineSlots = inject<Slots>('timelineSlots');
+const RowLabel = (slotProps: Record<string, unknown>) =>
+    timelineSlots?.rowLabel?.(slotProps) ?? null;
 
 const rowGroupedBySection = computed<Record<string | number, TimelineRowByUuidInterface[]>>(() => {
     const grouped: Record<string | number, TimelineRowByUuidInterface[]> = {};
@@ -60,7 +68,13 @@ const rowGroupedBySection = computed<Record<string | number, TimelineRowByUuidIn
                     v-for="row in rowGroupedBySection[section.uuid]"
                     :key="row.uuid"
                 >
-                    <span class="vtd__row-label-text">
+                    <RowLabel
+                        v-if="timelineSlots?.rowLabel"
+                        :uuid="row.uuid"
+                        :title="row.title"
+                        :section-uuid="section.uuid"
+                    />
+                    <span v-else class="vtd__row-label-text">
                         {{ row.title }}
                     </span>
                 </div>

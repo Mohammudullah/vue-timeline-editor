@@ -46,6 +46,20 @@ const onInit = (api: TimelineInitInterface) => {
     console.log('Timeline ready. Try the buttons above the editor.');
 };
 
+// ─── Reactive slot data ─────────────────────────────────────────────────
+// Per-row UI state keyed by row uuid. The `#rowLabel` slot template below
+// closes over this ref, so mutating it re-renders the labels live — without
+// touching timeline data or re-initialising sections.
+const rowAccents = ref<Record<string | number, string>>({});
+const tintRowLabels = () => {
+    const palette = ['#e53935', '#43a047', '#1e88e5', '#fb8c00', '#8e24aa'];
+    rowAccents.value = Object.fromEntries(
+        ['row1', 'row2', 'row3', 'row4', 'row5'].map(
+            (uuid, i) => [uuid, palette[(i + Date.now()) % palette.length]],
+        ),
+    );
+};
+
 // ─── Example 1 — optimistic add with server-side merge ───────────────────
 // Frame appears immediately in row2 with a temp uuid. The server "assigns"
 // a real uuid and the timeline swaps it in. If the server rejects, the
@@ -116,31 +130,71 @@ const removeLocal = (uuid: string) => {
     timelineApi.value?.timeline.removeFrame(uuid);
 };
 
-// ─── Example 5 — click an empty row area to add a frame ─────────────────
-// <Sections> emits `add-frame` with the suggested range; the host owns
-// uuid / title / sync, so just push it into the timeline here.
-let addedFrameId = 1;
-const onAddFrame = (suggestion: {
+// ─── Example 5 — click to add, then join more rows at the same time ─────
+// <Sections> emits `add-frame` with the suggested range. Instead of adding
+// straight away, this demo opens the "join tables" allowlist: it offers the
+// SAME time slot on a few rows, dims the rest, and lets the user pick which
+// rows to join. `confirmJoin` then adds a linked frame to each picked row.
+type SlotRange = {
     rowUuid: string | number,
     sectionUuid: string | number,
     start_ms: number,
     end_ms: number,
-}) => {
+};
+
+let addedFrameId = 1;
+
+// Allowlist state, bound to <Sections>.
+const availableSlots = ref<{
+    uuid: string | number,
+    available_slots: { start_ms: number, end_ms: number }[],
+}[]>([]);
+const selectedRowUuids = ref<(string | number)[]>([]);
+const pendingSlot = ref<SlotRange | null>(null);
+
+const onAddFrame = (suggestion: SlotRange) => {
     console.log('[add-frame] suggestion received:', {
-        rowUuid: suggestion.rowUuid,
-        sectionUuid: suggestion.sectionUuid,
-        start_ms: suggestion.start_ms,
-        end_ms: suggestion.end_ms,
+        ...suggestion,
         length_ms: suggestion.end_ms - suggestion.start_ms,
     });
-    timelineApi.value?.timeline.addFrame({
-        uuid: `added-${addedFrameId++}`,
-        title: 'New Frame',
-        start_ms: suggestion.start_ms,
-        end_ms: suggestion.end_ms,
-        rowUuid: suggestion.rowUuid,
-        sectionUuid: suggestion.sectionUuid,
-    });
+    // Open the allowlist: same slot offered on the first five rows.
+    pendingSlot.value = suggestion;
+    selectedRowUuids.value = [suggestion.rowUuid];
+    availableSlots.value = ['row1', 'row2', 'row3', 'row4', 'row5'].map(uuid => ({
+        uuid,
+        available_slots: [{ start_ms: suggestion.start_ms, end_ms: suggestion.end_ms }],
+    }));
+};
+
+const onSelectSlot = (slot: SlotRange) => {
+    console.log('[select-slot]', slot);
+    selectedRowUuids.value = selectedRowUuids.value.includes(slot.rowUuid)
+        ? selectedRowUuids.value.filter(u => u !== slot.rowUuid)
+        : [...selectedRowUuids.value, slot.rowUuid];
+};
+
+const closeAllowlist = () => {
+    availableSlots.value = [];
+    selectedRowUuids.value = [];
+    pendingSlot.value = null;
+};
+
+const confirmJoin = () => {
+    const slot = pendingSlot.value;
+    if (!slot) return;
+    const linkGroupUuid = `join-${Date.now()}`;
+    for (const rowUuid of selectedRowUuids.value) {
+        timelineApi.value?.timeline.addFrame({
+            uuid: `joined-${rowUuid}-${addedFrameId++}`,
+            title: 'Joined',
+            start_ms: slot.start_ms,
+            end_ms: slot.end_ms,
+            rowUuid,
+            sectionUuid: slot.sectionUuid,
+            linkGroupUuid,
+        });
+    }
+    closeAllowlist();
 };
 </script>
 
@@ -172,6 +226,13 @@ const onAddFrame = (suggestion: {
             <span style="align-self: center; color: #666;">
                 playhead: {{ (playheadMs / 1000).toFixed(1) }}s
             </span>
+            <button @click="tintRowLabels">🎨 Tint row labels</button>
+            <template v-if="availableSlots.length">
+                <button @click="confirmJoin">
+                    ✓ Confirm join ({{ selectedRowUuids.length }})
+                </button>
+                <button @click="closeAllowlist">✕ Cancel join</button>
+            </template>
         </div>
 
         <Timeline
@@ -183,9 +244,20 @@ const onAddFrame = (suggestion: {
                 end_seconds: 2610 + 1000 * 60,
             }"
         >
+            <!-- Reactive row-label slot: reads the `rowAccents` ref above,
+                 so "Tint row labels" updates these live. -->
+            <template #rowLabel="{ uuid, title }">
+                <span :style="{ color: rowAccents[uuid], fontWeight: 600 }">
+                    {{ title }}
+                </span>
+            </template>
+
             <Sections
                 row-clickable
                 @add-frame="onAddFrame"
+                @select-slot="onSelectSlot"
+                :available-slots="availableSlots"
+                :selected-row-uuids="selectedRowUuids"
                 :sections="[{
                     title: 'Section 1',
                     uuid: 'section1',

@@ -59,6 +59,21 @@
     background-color: rgb(0, 120, 215);
 }
 
+.vtd__allowlist-mask-fill {
+    fill: rgba(0, 0, 0, 0.5);
+}
+
+.vtd__allowlist-slot {
+    border-radius: 6px;
+    /* Fully clear — the cut-out in the dimmed editor is the highlight. */
+}
+
+.vtd__allowlist-slot--selected {
+    /* Selected picks read like the new-frame suggestion box. */
+    border: 2px dashed rgba(0, 120, 215, 0.55);
+    background-color: rgba(0, 120, 215, 0.08);
+}
+
 /**------------ Section Styles End ---------------**/
 
 

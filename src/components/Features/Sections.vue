@@ -8,19 +8,19 @@ import { TimelineSectionInterface } from '../../types/timeline';
 /**
  * <Sections/>
  *
- * Initialises the timeline's section/row/frame data, and — when enabled —
- * provides "click an empty area to add a frame": an empty row area shows a
- * dashed suggestion box; activating it emits `add-frame`.
+ * Initialises the timeline's section/row/frame data, and provides two
+ * empty-area interactions:
  *
- * Per row, the box length is:
- *  • `row.new_frame_ms` ms (capped by the available gap), when set;
- *  • otherwise the whole empty gap, when the `rowClickable` prop is on.
+ *  1. Click-to-add — an empty row area shows a dashed suggestion box;
+ *     activating it emits `add-frame`. Per row, the box length is
+ *     `row.new_frame_ms` ms (capped by the gap), or the whole gap when the
+ *     `rowClickable` prop is on. Touch uses a two-tap latch.
  *
- * Interaction:
- *  • Mouse/pen — the box follows the hover; a click on it emits `add-frame`.
- *  • Touch — the first tap latches the box (it stays put); a second tap on
- *    the box emits `add-frame`. The latched box shows a small label, which
- *    can be customised with the `newFrameLabel` prop or the `#label` slot.
+ *  2. Allowlist / slot-picking — when `availableSlots` is passed, the rest of
+ *     the editor is dimmed and locked, and only the listed time slots stay
+ *     clear and clickable. Clicking one emits `select-slot`; slots present in
+ *     `selectedTables` render in a selected style. This mode replaces the
+ *     click-to-add interaction while it's active.
  */
 const props = withDefaults(defineProps<{
     sections: TimelineSectionInterface[],
@@ -29,6 +29,16 @@ const props = withDefaults(defineProps<{
     rowClickable?: boolean,
     // Touch-mode label text. Overridden entirely by the `#label` slot.
     newFrameLabel?: string,
+    // Allowlist: per-table (row) time windows the user may pick. When set,
+    // the editor dims/locks and only these slots stay interactive. The
+    // typical use is joining tables — a join is only valid at the same time,
+    // so the allowlist confines picking to the matching slots.
+    availableSlots?: AvailableTableSlots[],
+    // The currently-picked table+slot pairs — rendered in a selected style.
+    selectedTables?: SelectedTableSlot[],
+    // Row uuids whose allowed slots render selected — a simpler alternative
+    // to `selectedTables` when every pick shares the same time (e.g. a join).
+    selectedRowUuids?: (string | number)[],
 }>(), {
     rowClickable: false,
     newFrameLabel: '+ Add',
@@ -41,8 +51,22 @@ export interface NewFrameSuggestion {
     end_ms: number,
 }
 
+// One table (row) and the time windows that are selectable on it.
+export interface AvailableTableSlots {
+    uuid: string | number,
+    available_slots: { start_ms: number, end_ms: number }[],
+}
+
+// A picked table+slot pair.
+export interface SelectedTableSlot {
+    uuid: string | number,
+    start_ms: number,
+    end_ms: number,
+}
+
 const emit = defineEmits<{
     'add-frame': [suggestion: NewFrameSuggestion, event: MouseEvent],
+    'select-slot': [slot: NewFrameSuggestion, event: MouseEvent],
 }>();
 
 const timeline = inject<UseTimelineInterface>('timeline');
@@ -57,14 +81,78 @@ onMounted(() => {
     timeline?.initSections(props.sections);
 });
 
+// ─── Allowlist (slot-picking) mode ──────────────────────────────────────
+const allowlistActive = computed(() => (props.availableSlots?.length ?? 0) > 0);
+
+interface AllowedSlotRect {
+    rowUuid: string | number,
+    sectionUuid: string | number,
+    start_ms: number,
+    end_ms: number,
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+    selected: boolean,
+}
+
+// Editor-relative pixel rectangles for every allowed slot, with their
+// selected state resolved against `selectedTables`.
+const allowedSlots = computed<AllowedSlotRect[]>(() => {
+    if (!timeline || !timelineConfig || !props.availableSlots) return [];
+
+    const rangeStartMs = (timelineConfig.range.start_seconds ?? 0) * 1000;
+    const ppms = timelineConfig.cols.pixelPerMs;
+    const padLeft = timelineConfig.editor.paddingLeft;
+    const rowHeight = timelineConfig.rows.height;
+    const selected = props.selectedTables ?? [];
+    const selectedRows = props.selectedRowUuids ?? [];
+
+    const out: AllowedSlotRect[] = [];
+    for (const table of props.availableSlots) {
+        const row = timeline.state.sectionRowsByUuid[table.uuid];
+        if (!row) continue;
+        for (const slot of table.available_slots) {
+            out.push({
+                rowUuid: table.uuid,
+                sectionUuid: row.sectionUuid,
+                start_ms: slot.start_ms,
+                end_ms: slot.end_ms,
+                left: (slot.start_ms - rangeStartMs) * ppms + padLeft,
+                top: row.editorRelativeTop,
+                width: (slot.end_ms - slot.start_ms) * ppms,
+                height: rowHeight,
+                selected: selectedRows.includes(table.uuid)
+                    || selected.some(t =>
+                        t.uuid === table.uuid
+                        && t.start_ms === slot.start_ms
+                        && t.end_ms === slot.end_ms),
+            });
+        }
+    }
+    return out;
+});
+
+const editorWidth = computed(() => timelineConfig?.editor.width ?? 0);
+const editorHeight = computed(() => timelineConfig?.editor.height ?? 0);
+
+const onSlotClick = (slot: AllowedSlotRect, event: MouseEvent) => {
+    emit('select-slot', {
+        rowUuid: slot.rowUuid,
+        sectionUuid: slot.sectionUuid,
+        start_ms: slot.start_ms,
+        end_ms: slot.end_ms,
+    }, event);
+};
+
+// ─── Click-to-add suggestion ────────────────────────────────────────────
 // `true` while the last pointer interaction was touch — touch has no hover,
 // so it uses the latched two-tap flow instead.
 const isTouch = ref(false);
 // Pointer-over-editor gate for mouse/pen. `timeline.state.pointer` keeps its
 // last value after the pointer leaves, so a hover flag is needed.
 const hovering = ref(false);
-// Latched suggestion for touch — frozen at the tap position; survives until
-// the box is tapped (emit), another empty area is tapped, or a frame is tapped.
+// Latched suggestion for touch — frozen at the tap position.
 const touchSuggestion = ref<NewFrameSuggestion | null>(null);
 
 // Pure computation: the suggestion for a given row + pointer-ms, or null when
@@ -74,6 +162,8 @@ const computeSuggestionAt = (
     onMs: number,
 ): NewFrameSuggestion | null => {
     if (!timeline || !timelineConfig) return null;
+    // Click-to-add is disabled while the allowlist owns the editor.
+    if (allowlistActive.value) return null;
     if (rowUuid == null) return null;
 
     const row = timeline.state.sectionRowsByUuid[rowUuid];
@@ -127,11 +217,11 @@ const hoverSuggestion = computed<NewFrameSuggestion | null>(() => {
     );
 });
 
-// The suggestion currently in effect — latched value on touch, live hover
-// value otherwise.
-const activeSuggestion = computed<NewFrameSuggestion | null>(() =>
-    isTouch.value ? touchSuggestion.value : hoverSuggestion.value,
-);
+// The suggestion currently in effect — null while the allowlist is active.
+const activeSuggestion = computed<NewFrameSuggestion | null>(() => {
+    if (allowlistActive.value) return null;
+    return isTouch.value ? touchSuggestion.value : hoverSuggestion.value;
+});
 
 // Editor-relative pixel geometry for the suggestion box — same mapping as
 // renderFrame, so the box aligns 1:1 with real frames.
@@ -220,6 +310,7 @@ const onSuggestionClick = (event: MouseEvent) => {
 
 <template>
     <Teleport to="#editorAreaTeleports" defer>
+        <!-- Click-to-add suggestion box -->
         <div
             v-if="suggestionStyle"
             class="vtd__new-frame-suggestion"
@@ -231,5 +322,61 @@ const onSuggestionClick = (event: MouseEvent) => {
                 <slot name="label" v-bind="labelSlotProps">{{ newFrameLabel }}</slot>
             </div>
         </div>
+
+        <!-- Allowlist mode: dim + lock the editor, keep allowed slots clear -->
+        <template v-if="allowlistActive">
+            <!-- Lock layer — eats pointer events on the dimmed area. -->
+            <div
+                class="vtd__allowlist-lock"
+                :style="{ width: editorWidth + 'px', height: editorHeight + 'px' }"
+                @pointerdown.stop
+                @click.stop
+            />
+
+            <!-- Dark mask with the allowed slots punched out as holes. -->
+            <svg
+                class="vtd__allowlist-mask"
+                :width="editorWidth"
+                :height="editorHeight"
+            >
+                <defs>
+                    <mask id="vtd-allowlist-mask">
+                        <rect :width="editorWidth" :height="editorHeight" fill="white" />
+                        <rect
+                            v-for="(slot, i) in allowedSlots"
+                            :key="`hole-${i}`"
+                            :x="slot.left"
+                            :y="slot.top"
+                            :width="slot.width"
+                            :height="slot.height"
+                            rx="6"
+                            fill="black"
+                        />
+                    </mask>
+                </defs>
+                <rect
+                    class="vtd__allowlist-mask-fill"
+                    :width="editorWidth"
+                    :height="editorHeight"
+                    mask="url(#vtd-allowlist-mask)"
+                />
+            </svg>
+
+            <!-- Clickable allowed-slot boxes. -->
+            <div
+                v-for="(slot, i) in allowedSlots"
+                :key="`slot-${i}`"
+                class="vtd__allowlist-slot"
+                :class="{ 'vtd__allowlist-slot--selected': slot.selected }"
+                :style="{
+                    left: slot.left + 'px',
+                    top: slot.top + 'px',
+                    width: slot.width + 'px',
+                    height: slot.height + 'px',
+                }"
+                @pointerdown.stop
+                @click.stop="onSlotClick(slot, $event)"
+            />
+        </template>
     </Teleport>
 </template>
