@@ -223,6 +223,13 @@ const computeSuggestionAt = (
     const row = timeline.state.sectionRowsByUuid[rowUuid];
     if (!row) return null;
 
+    // `pointer.over.rowUuid` is the NEAREST row by Y, so it stays set even
+    // when the pointer is inside a section-header band between rows. Gate
+    // strictly: only suggest when the pointer's Y is actually inside the
+    // row's vertical band.
+    const py = timeline.state.pointer.editorRelativeY;
+    if (py < row.editorRelativeTop || py >= row.editorRelativeBottom) return null;
+
     // Read from row state (set by initSections) so it works whether sections
     // were provided via the `sections` prop or `timeline.initSections(...)`.
     const length = row.new_frame_ms;
