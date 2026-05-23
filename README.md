@@ -92,14 +92,11 @@ Root component. Provides the timeline context to every descendant feature.
 |------|------|---------|-------------|
 | `initialRange` | `{ start_seconds, end_seconds }` | `0 → 24h` | Visible time window. `start_seconds` is a hard left bound. |
 | `timeAxisTimeFormat` | `string` | `'HH:mm:ss'` | Time-axis label format (e.g. `'hh:mm a'`). |
-| `frameHoldDuration` | `number` | `600` | Press-and-hold time (ms) before `@frameHold` fires. |
-| `frameHoldThreshold` | `number` | `8` | Movement tolerance (px); moving past it cancels the hold. |
 
 | Event | Payload | Description |
 |-------|---------|-------------|
 | `@init` | `TimelineInitInterface` | Fires once mounted — exposes the imperative API. |
 | `@scroll` | `Event` | Editor scrolled. |
-| `@frameHold` | `(frame, event)` | A frame was pressed and held in place. |
 
 | Slot | Props | Description |
 |------|-------|-------------|
@@ -142,11 +139,17 @@ Initializes section/row/frame data and provides click-to-add on empty areas.
 | `availableSlots` | `{ uuid, available_slots: { start_ms, end_ms }[] }[]` | — | Allowlist: per-row time windows the user may pick. When set, the editor dims/locks and only these slots stay interactive. |
 | `selectedTables` | `{ uuid, start_ms, end_ms }[]` | — | Picked table+slot pairs — rendered selected. |
 | `selectedRowUuids` | `(string \| number)[]` | — | Row uuids whose allowed slots render selected (simpler than `selectedTables` when every pick shares one time). |
+| `frameHoldDuration` | `number` | `600` | Press-and-hold time (ms) before `@frame-hold` fires. |
+| `frameHoldThreshold` | `number` | `8` | Movement tolerance (px); moving past it cancels the hold. |
+| `silentExternalSelection` | `boolean` | `false` | When true, `@frame-selected` / `@frame-deselected` fire only for user-driven changes (clicks). Programmatic changes (`selectByUuid`, `scrollToViewPort(_, _, true)`, etc.) are silent. |
 
 | Event | Payload | Description |
 |-------|---------|-------------|
 | `@add-frame` | `(suggestion, event)` | Empty area activated. `suggestion = { rowUuid, sectionUuid, start_ms, end_ms }` — the host creates the frame. |
 | `@select-slot` | `(slot, event)` | An allowlist slot was clicked. Same shape as `add-frame`'s `suggestion`. |
+| `@frame-hold` | `(frame, event)` | A frame was pressed and held in place. |
+| `@frame-selected` | `(frame)` | A frame became the selection's primary. |
+| `@frame-deselected` | `(frame)` | A frame stopped being the primary. When switching frames, `@frame-deselected` is **always emitted before** `@frame-selected`. |
 
 | Slot | Props | Description |
 |------|-------|-------------|

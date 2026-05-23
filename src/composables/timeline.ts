@@ -815,28 +815,49 @@ export const useTimeline = (
     const highlightTimers: Record<string | number, ReturnType<typeof setTimeout>> = {};
     const HIGHLIGHT_DURATION_MS = 1500;
 
+    // Late-bound selector — registered by useFrames during its setup so
+    // scrollToViewPort can optionally select the target without useTimeline
+    // having to know about the (later-created) frames feature.
+    let frameSelector: ((uuid: string | number) => boolean) | null = null;
+    const setFrameSelector = (fn: ((uuid: string | number) => boolean) | null) => {
+        frameSelector = fn;
+    };
+
     /**
-     * Smooth-scrolls the scroll pane so the given frame is in view (aligned
-     * to the left side of the viewport with a small leading margin). When
+     * Smooth-scrolls the scroll pane so the given frame is in view (placed
+     * at ~20% from the viewport's top-left, so it sits near-centred). When
      * `highlight` is true, also flags the frame for the blink animation —
      * the class is applied via timeline state and cleared automatically when
-     * the animation completes.
+     * the animation completes. When `select` is true, replaces the selection
+     * with this frame (the frames feature is always on; the selector is
+     * registered automatically).
      *
      * When the targeted frame has a `linkGroupUuid`, every frame sharing the
      * group is highlighted together so a joined booking blinks as one unit
      * regardless of which member uuid was passed in.
      */
-    const scrollToViewPort = (uuid: string | number, highlight = false) => {
+    const scrollToViewPort = (uuid: string | number, highlight = false, select = false) => {
         const frame = state.sectionFramesByUuid[uuid];
         const pane = state.scrollPaneEl;
         if (!frame || !pane) return;
 
         const viewportWidth = pane.clientWidth;
+        const viewportHeight = pane.clientHeight;
         // Leave ~20% of the viewport as leading space so the frame doesn't
         // sit flush against the left edge. Clamp at 0 so very-early frames
         // don't try to scroll negative.
         const targetLeft = Math.max(0, frame.editorRelativeLeft - viewportWidth * 0.2);
-        pane.scrollTo({ left: targetLeft, behavior: 'smooth' });
+
+        // Vertical mirrors horizontal: place the row at ~20% from the top of
+        // the viewport so the frame sits near-centred (a touch above middle).
+        const row = state.sectionRowsByUuid[frame.rowUuid];
+        const targetTop = row
+            ? Math.max(0, row.editorRelativeTop - viewportHeight * 0.2)
+            : pane.scrollTop;
+
+        pane.scrollTo({ left: targetLeft, top: targetTop, behavior: 'smooth' });
+
+        if (select) frameSelector?.(uuid);
 
         if (highlight) {
             // Collect every uuid that should blink: the target itself plus
@@ -912,6 +933,7 @@ export const useTimeline = (
         enableEdgeScrolling,
         disableEdgeScrolling,
         scrollToViewPort,
+        setFrameSelector,
         setPending,
         isPending,
         setLoadingMode,

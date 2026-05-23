@@ -71,9 +71,18 @@ export const useFrames = ({
         state.primary.container = null;
     };
 
+    // Source of the most recent selection change. `selectFrame` flips this
+    // based on whether a real PointerEvent was provided; internal callers
+    // that bypass selectFrame use `_clearAllAs(...)` to mark explicitly.
+    // Consumers (e.g. <Sections/>) read it to decide whether to surface the
+    // change as a `frame-selected` / `frame-deselected` event.
+    let lastSelectionSource: 'user' | 'programmatic' = 'programmatic';
+    const getLastSelectionSource = () => lastSelectionSource;
+
     /**
      * Replace the entire selection with a single frame and make it primary.
-     * Called by click-to-select.
+     * Called by click-to-select. The source is 'user' when a PointerEvent
+     * is provided, otherwise 'programmatic'.
      */
     const selectFrame = (
         event: PointerEvent | null,
@@ -81,17 +90,46 @@ export const useFrames = ({
         container: HTMLDivElement,
         uuid: string | number,
     ) => {
-        void event;
+        lastSelectionSource = event ? 'user' : 'programmatic';
         _setPrimary(uuid, frame, container);
         state.selectedUuids = [uuid];
     };
 
-    /**
-     * Clear all selection — primary and members.
-     */
-    const deselectAll = () => {
+    // Shared clear used by both the public deselectAll (programmatic by
+    // default) and the editor outside-click handler (which marks 'user').
+    const _clearAllAs = (source: 'user' | 'programmatic') => {
+        lastSelectionSource = source;
         _clearPrimary();
         state.selectedUuids = [];
+    };
+
+    /**
+     * Convenience: select a frame by uuid alone. Resolves the frame data and
+     * live container internally. Returns false when the frame isn't in state
+     * or its container hasn't mounted yet. Pairs naturally with
+     * `timeline.scrollToViewPort(uuid)` for a "jump-and-select" effect.
+     */
+    const selectByUuid = (uuid: string | number): boolean => {
+        const frame = timeline.state.sectionFramesByUuid[uuid];
+        const container = containers[uuid];
+        if (!frame || !container) return false;
+        selectFrame(null, frame, container, uuid);
+        return true;
+    };
+
+    // Register with the timeline so `scrollToViewPort(uuid, _, true)` can
+    // select the target. Late-bound because useFrames is created after
+    // useTimeline; cleared on unmount to avoid leaks.
+    timeline.setFrameSelector(selectByUuid);
+    onBeforeUnmount(() => timeline.setFrameSelector(null));
+
+    /**
+     * Clear all selection — primary and members. Marks the change as
+     * 'programmatic'; the editor outside-click handler uses `_clearAllAs`
+     * with 'user' directly so it can be distinguished from API calls.
+     */
+    const deselectAll = () => {
+        _clearAllAs('programmatic');
     };
 
     // Backwards-compatible alias.
@@ -326,7 +364,9 @@ export const useFrames = ({
     const onEditorClick = (event: MouseEvent) => {
         const onFrame = (event.target as HTMLElement | null)
             ?.closest?.('.vtd__row-frame-container');
-        if (!onFrame) deselectAll();
+        // User clicked outside a frame — clear as a user-driven deselect so
+        // <Sections silentExternalSelection> still surfaces this case.
+        if (!onFrame) _clearAllAs('user');
     };
 
     const editorListeners: Record<string, EventListener> = {
@@ -382,7 +422,9 @@ export const useFrames = ({
         containers,
         // selection api
         selectFrame,
+        selectByUuid,
         deselectFrame,
+        getLastSelectionSource,
         deselectAll,
         toggleFrame,
         addToSelection,

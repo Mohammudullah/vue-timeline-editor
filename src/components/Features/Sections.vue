@@ -3,7 +3,7 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
-import { TimelineSectionInterface } from '../../types/timeline';
+import { TimelineFrameByUuidInterface, TimelineSectionInterface } from '../../types/timeline';
 
 /**
  * <Sections/>
@@ -39,9 +39,21 @@ const props = withDefaults(defineProps<{
     // Row uuids whose allowed slots render selected — a simpler alternative
     // to `selectedTables` when every pick shares the same time (e.g. a join).
     selectedRowUuids?: (string | number)[],
+    // Press-and-hold duration (ms) before `frame-hold` fires.
+    frameHoldDuration?: number,
+    // Movement tolerance (px) past which a hold is treated as a drag and cancelled.
+    frameHoldThreshold?: number,
+    // When true, `frame-selected` / `frame-deselected` only fire for user-
+    // driven changes (clicks, outside-click deselect). Programmatic changes
+    // (selectByUuid, scrollToViewPort(_, _, true), API calls, auto-cleanup
+    // after removeFrame, etc.) are silent.
+    silentExternalSelection?: boolean,
 }>(), {
     rowClickable: false,
     newFrameLabel: '+ Add',
+    frameHoldDuration: 600,
+    frameHoldThreshold: 8,
+    silentExternalSelection: false,
 });
 
 export interface NewFrameSuggestion {
@@ -67,6 +79,12 @@ export interface SelectedTableSlot {
 const emit = defineEmits<{
     'add-frame': [suggestion: NewFrameSuggestion, event: MouseEvent],
     'select-slot': [slot: NewFrameSuggestion, event: MouseEvent],
+    // Press-and-hold gesture (see `frameHoldDuration` / `frameHoldThreshold`).
+    'frame-hold': [frame: TimelineFrameByUuidInterface, event: PointerEvent],
+    // Selection-change events. When the user switches from frame A to frame
+    // B, `frame-deselected(A)` is always fired BEFORE `frame-selected(B)`.
+    'frame-selected': [frame: TimelineFrameByUuidInterface],
+    'frame-deselected': [frame: TimelineFrameByUuidInterface],
 }>();
 
 const timeline = inject<UseTimelineInterface>('timeline');
@@ -80,6 +98,42 @@ if (!timeline || !timelineConfig) {
 onMounted(() => {
     timeline?.initSections(props.sections);
 });
+
+// ─── Frame interaction events ───────────────────────────────────────────
+// Press-and-hold — surfaced as `frame-hold`.
+if (features) {
+    features.data.frames.setHoldDuration(props.frameHoldDuration);
+    features.data.frames.setHoldThreshold(props.frameHoldThreshold);
+    features.data.frames.onFrameHold((frame, event) => emit('frame-hold', frame, event));
+}
+watch(() => props.frameHoldDuration, (ms) =>
+    features?.data.frames.setHoldDuration(ms));
+watch(() => props.frameHoldThreshold, (px) =>
+    features?.data.frames.setHoldThreshold(px));
+
+// Selection-change emits. The watcher fires once per primary-uuid change;
+// emitting deselected FIRST and selected SECOND inside the same callback
+// guarantees the user-facing order (Vue emits are synchronous, so handlers
+// run in this exact sequence). When `silentExternalSelection` is on,
+// programmatic changes (API calls) are skipped.
+watch(
+    () => features?.data.frames.state.primary.uuid ?? null,
+    (newUuid, oldUuid) => {
+        if (newUuid === oldUuid) return;
+        if (props.silentExternalSelection
+            && features?.data.frames.getLastSelectionSource() === 'programmatic') {
+            return;
+        }
+        if (oldUuid != null) {
+            const f = timeline?.state.sectionFramesByUuid[oldUuid];
+            if (f) emit('frame-deselected', f);
+        }
+        if (newUuid != null) {
+            const f = timeline?.state.sectionFramesByUuid[newUuid];
+            if (f) emit('frame-selected', f);
+        }
+    },
+);
 
 // ─── Allowlist (slot-picking) mode ──────────────────────────────────────
 const allowlistActive = computed(() => (props.availableSlots?.length ?? 0) > 0);

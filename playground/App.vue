@@ -238,7 +238,6 @@ const confirmJoin = () => {
         <Timeline
             time-axis-time-format="hh:mm a"
             @init="onInit"
-            @frame-hold="(frame) => console.log('frame held:', frame.uuid, frame.title)"
             :initial-range="{
                 start_seconds: 2610,
                 end_seconds: 2610 + 1000 * 60,
@@ -256,6 +255,9 @@ const confirmJoin = () => {
                 row-clickable
                 @add-frame="onAddFrame"
                 @select-slot="onSelectSlot"
+                @frame-hold="(frame) => console.log('frame held:', frame.uuid, frame.title)"
+                @frame-deselected="(frame) => console.log('deselected:', frame.uuid)"
+                @frame-selected="(frame) => console.log('selected:', frame.uuid)"
                 :available-slots="availableSlots"
                 :selected-row-uuids="selectedRowUuids"
                 :sections="[{

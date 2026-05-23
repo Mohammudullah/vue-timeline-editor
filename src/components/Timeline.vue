@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, provide, ref, useSlots, watch } from 'vue';
+import { onBeforeUnmount, onMounted, provide, ref, useSlots } from 'vue';
 import { useTimeline, UseTimelineInterface } from '../composables/timeline';
-import { TimelineFrameByUuidInterface, TimelineRangeArgInterface } from '../types/timeline';
+import { TimelineRangeArgInterface } from '../types/timeline';
 import { TimelineConfigInterface, useTimelineConfig } from '../composables/timelineConfig';
 import XAxis from './Timeline/Axis/XAxis.vue';
 
@@ -16,18 +16,12 @@ import { useFeatures, UseFeaturesType } from '../composables/features/features';
 const props = withDefaults(defineProps<{
     initialRange?: TimelineRangeArgInterface,
     timeAxisTimeFormat?: TimeStringTimeFormatOptions,
-    // Press-and-hold duration (ms) before `@frameHold` fires.
-    frameHoldDuration?: number,
-    // Movement tolerance (px) past which a hold is treated as a drag and cancelled.
-    frameHoldThreshold?: number,
 }>(), {
     initialRange: () => ({
         start_seconds: 0, //start at 12:00 am
         end_seconds: 24 * 60 * 60 //end at 11:59 pm
     }),
     timeAxisTimeFormat: 'HH:mm:ss',
-    frameHoldDuration: 600,
-    frameHoldThreshold: 8,
 })
 
 export interface TimelineInitInterface {
@@ -45,8 +39,6 @@ export interface TimelineInitInterface {
 const emits = defineEmits<{
     'init': [value: TimelineInitInterface],
     'scroll': [value: Event],
-    // Fires when a frame is pressed and held (see `frameHoldDuration`).
-    'frameHold': [frame: TimelineFrameByUuidInterface, event: PointerEvent],
 }>()
 
 const timelineContainer = ref<HTMLDivElement | null>(null);
@@ -77,14 +69,6 @@ const features = useFeatures({
     timeline,
     timelineConfig,
 });
-
-// Configure + surface the always-on press-and-hold gesture as `@frameHold`.
-features.data.frames.setHoldDuration(props.frameHoldDuration);
-features.data.frames.setHoldThreshold(props.frameHoldThreshold);
-features.data.frames.onFrameHold((frame, event) => emits('frameHold', frame, event));
-
-watch(() => props.frameHoldDuration, (ms) => features.data.frames.setHoldDuration(ms));
-watch(() => props.frameHoldThreshold, (px) => features.data.frames.setHoldThreshold(px));
 
 provide('timeline', timeline);
 provide('timelineConfig', timelineConfig);
