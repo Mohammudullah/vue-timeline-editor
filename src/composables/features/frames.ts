@@ -138,6 +138,11 @@ export const useFrames = ({
     /**
      * Click toggle: if the clicked frame is already primary, clear all.
      * Otherwise replace the selection with this frame.
+     *
+     * When the click is the tail of a press-and-hold (the hold timer fired
+     * during the gesture), the toggle is suppressed — the frame stays
+     * selected so the host's `frame-hold` handler can act on it without it
+     * being immediately deselected by the release click.
      */
     const toggleFrame = (
         event: PointerEvent,
@@ -145,8 +150,13 @@ export const useFrames = ({
         container: HTMLDivElement,
         uuid: string | number,
     ) => {
+        if (holdJustFired) {
+            holdJustFired = false;
+            selectFrame(event, frame, container, uuid);
+            return;
+        }
         if (state.primary.uuid === uuid) {
-            deselectAll();
+            _clearAllAs('user');
         } else {
             selectFrame(event, frame, container, uuid);
         }
@@ -299,6 +309,10 @@ export const useFrames = ({
         uuid: string | number,
         event: PointerEvent,
     } | null = null;
+    // True between the hold timer firing and the next click/pointerdown.
+    // `toggleFrame` reads this to suppress the deselect that would otherwise
+    // happen on the release click after a long-press.
+    let holdJustFired = false;
 
     const cancelHold = () => {
         if (holdTimer !== null) {
@@ -322,6 +336,9 @@ export const useFrames = ({
 
     const onEditorPointerDown = (event: PointerEvent) => {
         cancelHold();
+        // Fresh gesture — clear any stale flag from a previous hold whose
+        // release click never reached us (e.g. pointer lifted off-frame).
+        holdJustFired = false;
         if (holdHandlers.size === 0 || holdDurationMs <= 0) return;
 
         const uuid = frameUuidForTarget(event.target as Node | null);
@@ -341,6 +358,10 @@ export const useFrames = ({
             if (!gesture) return;
             const frame = timeline.state.sectionFramesByUuid[gesture.uuid];
             if (!frame) return;
+            // Mark so the imminent release click doesn't toggle-off the
+            // frame. Consumed (reset) by the next toggleFrame or cleared
+            // on the next pointerdown if no click follows.
+            holdJustFired = true;
             holdHandlers.forEach(handler => handler(frame, gesture.event));
         }, holdDurationMs);
     };

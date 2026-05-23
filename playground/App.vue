@@ -43,7 +43,14 @@ const playheadPlaying = ref(false);
 
 const onInit = (api: TimelineInitInterface) => {
     timelineApi.value = api;
-    console.log('Timeline ready. Try the buttons above the editor.');
+    console.log('Timeline ready (rows shown, frames in 2s).');
+    // Simulates an async fetch on app start: rows mount immediately (so the
+    // user sees the empty grid right away), then the frames are loaded via
+    // initSections() 2s later.
+    setTimeout(() => {
+        api.timeline.initSections(sections);
+        console.log('Frames pushed.');
+    }, 0);
 };
 
 // ─── Reactive slot data ─────────────────────────────────────────────────
@@ -59,6 +66,169 @@ const tintRowLabels = () => {
         ),
     );
 };
+
+// ─── Sections / bookings demo data ──────────────────────────────────────
+// 20 bookings spread across two sections, with four joined-row groups
+// (rows 1+2, rows 5+6+7, rows 12+13, rows 15+16) — joined entries share a
+// `linkGroupUuid` and identical start/end_ms.
+//
+// `emptySections` (derived below) is what mounts immediately so the rows
+// are visible right away; the full `sections` (with frames) is pushed via
+// `initSections()` after a 2-second simulated fetch.
+const m = (mins: number) => mins * 60 * 1000;
+const sections = [
+    {
+        title: 'Section 1',
+        uuid: 'section1',
+        rows: [
+            {
+                uuid: 'row1',
+                title: 'Row 1',
+                frames: [
+                    { uuid: 'b1', title: 'Booking 1', start_ms: m(100), end_ms: m(180) },
+                    { uuid: 'b2', title: 'Booking 2 (joined)', start_ms: m(300), end_ms: m(380), linkGroupUuid: 'g1' },
+                ],
+            },
+            {
+                uuid: 'row2',
+                title: 'Row 2',
+                frames: [
+                    { uuid: 'b3', title: 'Booking 3 (joined)', start_ms: m(300), end_ms: m(380), linkGroupUuid: 'g1' },
+                ],
+            },
+            {
+                uuid: 'row3',
+                title: 'Row 3',
+                new_frame_ms: 50 * 60 * 1000,
+                frames: [
+                    { uuid: 'b4', title: 'Booking 4', start_ms: m(80), end_ms: m(140) },
+                    { uuid: 'b5', title: 'Booking 5', start_ms: m(500), end_ms: m(580) },
+                ],
+            },
+            {
+                uuid: 'row4',
+                title: 'Row 4',
+                frames: [
+                    { uuid: 'b6', title: 'Booking 6', start_ms: m(200), end_ms: m(260) },
+                ],
+            },
+            {
+                uuid: 'row5',
+                title: 'Row 5',
+                frames: [
+                    { uuid: 'b7', title: 'Booking 7 (joined)', start_ms: m(450), end_ms: m(510), linkGroupUuid: 'g2' },
+                ],
+            },
+            {
+                uuid: 'row6',
+                title: 'Row 6',
+                frames: [
+                    { uuid: 'b8', title: 'Booking 8 (joined)', start_ms: m(450), end_ms: m(510), linkGroupUuid: 'g2' },
+                ],
+            },
+            {
+                uuid: 'row7',
+                title: 'Row 7',
+                frames: [
+                    { uuid: 'b9', title: 'Booking 9 (joined)', start_ms: m(450), end_ms: m(510), linkGroupUuid: 'g2' },
+                ],
+            },
+            {
+                uuid: 'row8',
+                title: 'Row 8',
+                frames: [
+                    { uuid: 'b10', title: 'Booking 10', start_ms: m(600), end_ms: m(700) },
+                ],
+            },
+            { uuid: 'row9',  title: 'Row 9',  frames: [] },
+            { uuid: 'row10', title: 'Row 10', frames: [] },
+        ],
+    },
+    {
+        title: 'Section 2',
+        uuid: 'section2',
+        rows: [
+            {
+                uuid: 'row11',
+                title: 'Row 11',
+                frames: [
+                    { uuid: 'b11', title: 'Booking 11', start_ms: m(90), end_ms: m(170) },
+                ],
+            },
+            {
+                uuid: 'row12',
+                title: 'Row 12',
+                frames: [
+                    { uuid: 'b12', title: 'Booking 12 (joined)', start_ms: m(250), end_ms: m(320), linkGroupUuid: 'g3' },
+                ],
+            },
+            {
+                uuid: 'row13',
+                title: 'Row 13',
+                frames: [
+                    { uuid: 'b13', title: 'Booking 13 (joined)', start_ms: m(250), end_ms: m(320), linkGroupUuid: 'g3' },
+                ],
+            },
+            {
+                uuid: 'row14',
+                title: 'Row 14',
+                frames: [
+                    { uuid: 'b14', title: 'Booking 14', start_ms: m(400), end_ms: m(480) },
+                ],
+            },
+            {
+                uuid: 'row15',
+                title: 'Row 15',
+                frames: [
+                    { uuid: 'b15', title: 'Booking 15 (joined)', start_ms: m(100), end_ms: m(200), linkGroupUuid: 'g4' },
+                ],
+            },
+            {
+                uuid: 'row16',
+                title: 'Row 16',
+                frames: [
+                    { uuid: 'b16', title: 'Booking 16 (joined)', start_ms: m(100), end_ms: m(200), linkGroupUuid: 'g4' },
+                ],
+            },
+            {
+                uuid: 'row17',
+                title: 'Row 17',
+                frames: [
+                    { uuid: 'b17', title: 'Booking 17', start_ms: m(550), end_ms: m(640) },
+                ],
+            },
+            {
+                uuid: 'row18',
+                title: 'Row 18',
+                frames: [
+                    { uuid: 'b18', title: 'Booking 18', start_ms: m(720), end_ms: m(800) },
+                ],
+            },
+            {
+                uuid: 'row19',
+                title: 'Row 19',
+                frames: [
+                    { uuid: 'b19', title: 'Booking 19', start_ms: m(850), end_ms: m(940) },
+                ],
+            },
+            {
+                uuid: 'row20',
+                title: 'Row 20',
+                frames: [
+                    { uuid: 'b20', title: 'Booking 20', start_ms: m(60), end_ms: m(130) },
+                ],
+            },
+        ],
+    },
+];
+
+// Same shape as `sections` but with every row's frames stripped — used for
+// the immediate mount so the grid renders right away, before initSections()
+// is called with the populated data 2s later.
+const emptySections = sections.map(s => ({
+    ...s,
+    rows: s.rows.map(r => ({ ...r, frames: [] })),
+}));
 
 // ─── Example 1 — optimistic add with server-side merge ───────────────────
 // Frame appears immediately in row2 with a temp uuid. The server "assigns"
@@ -260,243 +430,7 @@ const confirmJoin = () => {
                 @frame-selected="(frame) => console.log('selected:', frame.uuid)"
                 :available-slots="availableSlots"
                 :selected-row-uuids="selectedRowUuids"
-                :sections="[{
-                    title: 'Section 1',
-                    uuid: 'section1',
-                    rows: [
-                        {   
-                            uuid: 'row1',
-                            title: 'Row 1',
-                            frames: [{
-                                uuid: 'frame1',
-                                title: 'Frame 1',
-                                start_ms: 0,
-                                end_ms: 2 * 60 * 60 * 1000,
-                                linkGroupUuid: 'group-a'
-                            }]
-                        },
-                        {
-                            uuid: 'row2',
-                            title: 'Row 2',
-                            frames: [
-                                {
-                                    uuid: 'frame2',
-                                    title: 'Frame 2',
-                                    start_ms: 2 * 60 * 60 * 1000,
-                                    end_ms: 4 * 60 * 60 * 1000
-                                },
-                                {
-                                    uuid: 'row2-frame3',
-                                    title: 'Frame 3',
-                                    start_ms: 0,
-                                    end_ms: 2 * 60 * 60 * 1000,
-                                    linkGroupUuid: 'group-a'
-                                }
-                            ]
-                        },
-                        {
-                            uuid: 'row3',
-                            title: 'Row 3',
-                            // Fixed-length suggestion: hovering an empty area
-                            // proposes a 2-minute frame (capped by the gap).
-                            // Kept well under the ~9.8-min timeline range so
-                            // the box is visibly shorter than the full row.
-                            new_frame_ms: 50 * 60 * 1000,
-                            frames: [{
-                                uuid: 'frame3',
-                                title: 'Frame 3',
-                                start_ms: 4 * 60 * 60 * 1000,
-                                end_ms: 6 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row4',
-                            title: 'Row 4',
-                            frames: [{
-                                uuid: 'frame4',
-                                title: 'Frame 4',
-                                start_ms: 6 * 60 * 60 * 1000,
-                                end_ms: 8 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row5',
-                            title: 'Row 5',
-                            frames: [{
-                                uuid: 'frame5',
-                                title: 'Frame 5',
-                                start_ms: 8 * 60 * 60 * 1000,
-                                end_ms: 10 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row6',
-                            title: 'Row 6',
-                            frames: [{
-                                uuid: 'frame6',
-                                title: 'Frame 6',
-                                start_ms: 10 * 60 * 60 * 1000,
-                                end_ms: 12 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row7',
-                            title: 'Row 7',
-                            frames: [{
-                                uuid: 'frame7',
-                                title: 'Frame 7',
-                                start_ms: 8 * 60 * 60 * 1000,
-                                end_ms: 10 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row8',
-                            title: 'Row 8',
-                            frames: [{
-                                uuid: 'frame8',
-                                title: 'Frame 8',
-                                start_ms: 2 * 60 * 60 * 1000,
-                                end_ms: 6 * 60 * 60 * 1000,
-                                linkGroupUuid: 'group-b'
-                            }]
-                        },
-                        {
-                            uuid: 'row9',
-                            title: 'Row 9',
-                            frames: [{
-                                uuid: 'frame9',
-                                title: 'Frame 9',
-                                start_ms: 2 * 60 * 60 * 1000,
-                                end_ms: 6 * 60 * 60 * 1000,
-                                linkGroupUuid: 'group-b'
-                            }]
-                        },
-                        {
-                            uuid: 'row10',
-                            title: 'Row 10',
-                            frames: [{
-                                uuid: 'frame10',
-                                title: 'Frame 10',
-                                start_ms: 10 * 60 * 60 * 1000,
-                                end_ms: 12 * 60 * 60 * 1000
-                            }]
-                        }
-                    ]
-                },
-                {
-                    title: 'Section 2',
-                    uuid: 'section2',
-                    rows: [
-                        {
-                            uuid: 'row11',
-                            title: 'Row 11',
-                            frames: [{
-                                uuid: 'frame1-row11',
-                                title: 'Frame 1',
-                                start_ms: 0,
-                                end_ms: 2 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row12',
-                            title: 'Row 12',
-                            frames: [
-                                {
-                                    uuid: 'frame2-row12',
-                                    title: 'Frame 2',
-                                    start_ms: 2 * 60 * 60 * 1000,
-                                    end_ms: 4 * 60 * 60 * 1000
-                                },
-                                {
-                                    uuid: 'frame3-row12',
-                                    title: 'Frame 3',
-                                    start_ms: 0,
-                                    end_ms: 2 * 60 * 60 * 1000
-                                }
-                            ]
-                        },
-                        {
-                            uuid: 'row13',
-                            title: 'Row 13',
-                            frames: [{
-                                uuid: 'frame3-row13',
-                                title: 'Frame 3',
-                                start_ms: 4 * 60 * 60 * 1000,
-                                end_ms: 6 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row14',
-                            title: 'Row 14',
-                            frames: [{
-                                uuid: 'frame4-row14',
-                                title: 'Frame 4',
-                                start_ms: 6 * 60 * 60 * 1000,
-                                end_ms: 8 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row15',
-                            title: 'Row 15',
-                            frames: [{
-                                uuid: 'frame5-row15',
-                                title: 'Frame 5',
-                                start_ms: 8 * 60 * 60 * 1000,
-                                end_ms: 10 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row16',
-                            title: 'Row 16',
-                            frames: [{
-                                uuid: 'frame6-row16',
-                                title: 'Frame 6',
-                                start_ms: 10 * 60 * 60 * 1000,
-                                end_ms: 12 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row17',
-                            title: 'Row 17',
-                            frames: [{
-                                uuid: 'frame7-row17',
-                                title: 'Frame 7',
-                                start_ms: 8 * 60 * 60 * 1000,
-                                end_ms: 10 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row18',
-                            title: 'Row 18',
-                            frames: [{
-                                uuid: 'frame8-row18',
-                                title: 'Frame 8',
-                                start_ms: 2 * 60 * 60 * 1000,
-                                end_ms: 6 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row19',
-                            title: 'Row 19',
-                            frames: [{
-                                uuid: 'frame9-row19',
-                                title: 'Frame 9',
-                                start_ms: 8 * 60 * 60 * 1000,
-                                end_ms: 9 * 60 * 60 * 1000
-                            }]
-                        },
-                        {
-                            uuid: 'row20',
-                            title: 'Row 20',
-                            frames: [{
-                                uuid: 'frame10-row20',
-                                title: 'Frame 10',
-                                start_ms: 10 * 60 * 60 * 1000,
-                                end_ms: 12 * 60 * 60 * 1000
-                            }]
-                        }
-                    ]
-                }]"
+                :sections="emptySections"
             >
                 <!-- Touch-mode label override — shows the proposed length. -->
                 <template #label="{ length_ms }">
