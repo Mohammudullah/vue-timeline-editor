@@ -117,6 +117,26 @@ export const useFrames = ({
         return true;
     };
 
+    /**
+     * Symmetric counterpart to `selectByUuid`. Clears `uuid` from the
+     * selection:
+     *   • if it's the primary, clears the entire selection (deselectAll);
+     *   • if it's a non-primary member, removes just that uuid;
+     *   • otherwise no-op.
+     * Returns true when something was removed.
+     */
+    const deselectByUuid = (uuid: string | number): boolean => {
+        if (state.primary.uuid === uuid) {
+            deselectAll();
+            return true;
+        }
+        if (state.selectedUuids.includes(uuid)) {
+            removeFromSelection([uuid]);
+            return true;
+        }
+        return false;
+    };
+
     // Register with the timeline so `scrollToViewPort(uuid, _, true)` can
     // select the target. Late-bound because useFrames is created after
     // useTimeline; cleared on unmount to avoid leaks.
@@ -445,6 +465,7 @@ export const useFrames = ({
         selectFrame,
         selectByUuid,
         deselectFrame,
+        deselectByUuid,
         getLastSelectionSource,
         deselectAll,
         toggleFrame,
