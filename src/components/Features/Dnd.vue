@@ -138,7 +138,7 @@ const ghostLinkFlags = (uuid: string | number) => {
                 top: 0,
                 left: 0,
                 position: 'absolute',
-                zIndex: 1,
+                zIndex: 6,
                 pointerEvents: 'none',
             }"
         >
@@ -175,6 +175,7 @@ const ghostLinkFlags = (uuid: string | number) => {
                 top: 0,
                 left: 0,
                 position: 'absolute',
+                zIndex: 5,
                 pointerEvents: 'none',
             }"
         >

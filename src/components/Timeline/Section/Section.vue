@@ -28,15 +28,18 @@ const section = computed<TimelineSectionByUuidInterface | null>(() => {
     <div class="vtd__timeline-section">
         <div class="vtd__timeline-section-container">
 
-            <div 
+            <div
                 class="vtd__section-label"
-                :style="{
-                    height: config.sections.labelHeight + 'px',
-                    paddingLeft: config.editor.paddingLeft + 'px',
-                    paddingRight: config.editor.paddingRight + 'px'
-                }"
+                :style="{ height: config.sections.labelHeight + 'px' }"
             >
-                {{ section?.title }}
+                <div
+                    class="vtd__section-label-inner"
+                    :style="{ paddingLeft: config.editor.paddingLeft + 'px' }"
+                >
+                    <slot name="section-label" :section="section" :config="config">
+                        {{ section?.title }}
+                    </slot>
+                </div>
             </div>
 
             <Rows

@@ -197,6 +197,9 @@ onBeforeUnmount(() => {
                                 :timeline="timeline"
                                 :features="features"
                             >
+                                <template #section-label="slotProps">
+                                    <slot name="section-label" v-bind="slotProps" />
+                                </template>
                                 <template #frame="slotProps">
                                     <slot name="frame" v-bind="slotProps" />
                                 </template>

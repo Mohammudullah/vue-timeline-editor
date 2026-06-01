@@ -79,6 +79,7 @@ export interface SelectedTableSlot {
 const emit = defineEmits<{
     'add-frame': [suggestion: NewFrameSuggestion, event: MouseEvent],
     'select-slot': [slot: NewFrameSuggestion, event: MouseEvent],
+    'clear-allowlist': [event: MouseEvent],
     // Press-and-hold gesture (see `frameHoldDuration` / `frameHoldThreshold`).
     'frame-hold': [frame: TimelineFrameByUuidInterface, event: PointerEvent],
     // Selection-change events. When the user switches from frame A to frame
@@ -245,10 +246,10 @@ const computeSuggestionAt = (
 
     // Fixed length capped by the gap; otherwise the whole gap.
     const len = length != null ? Math.min(length, areaLen) : areaLen;
-    // Fixed-length box is centred on the pointer (the clamp below shifts it
-    // so it stays inside the gap near the edges); the full-gap box just
-    // spans the area.
-    let start = length != null ? onMs - len / 2 : area.start_ms;
+    // Fixed-length box starts at the cursor (left-aligned); the clamp below
+    // shifts it left if it would overflow the gap's right edge. Full-gap box
+    // spans the whole area unchanged.
+    let start = length != null ? onMs : area.start_ms;
 
     // Snap the start to the grid when the Snapping feature is active. Only
     // the fixed-length box — the full-gap box already sits on frame edges.
@@ -391,7 +392,7 @@ const onSuggestionClick = (event: MouseEvent) => {
                 class="vtd__allowlist-lock"
                 :style="{ width: editorWidth + 'px', height: editorHeight + 'px' }"
                 @pointerdown.stop
-                @click.stop
+                @click.stop="emit('clear-allowlist', $event)"
             />
 
             <!-- Dark mask with the allowed slots punched out as holes. -->
