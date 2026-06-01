@@ -29,11 +29,12 @@ const props = withDefaults(defineProps<{
     rowClickable?: boolean,
     // Touch-mode label text. Overridden entirely by the `#label` slot.
     newFrameLabel?: string,
-    // Allowlist: per-table (row) time windows the user may pick. When set,
-    // the editor dims/locks and only these slots stay interactive. The
-    // typical use is joining tables — a join is only valid at the same time,
-    // so the allowlist confines picking to the matching slots.
+    // Allowlist: per-table (row) time windows the user may pick.
     availableSlots?: AvailableTableSlots[],
+    // When true, activates the dim overlay + lock layer so only the listed
+    // slots are interactive. When false (default), availableSlots can still
+    // be populated for selection tracking without showing the overlay.
+    allowlistActive?: boolean,
     // The currently-picked table+slot pairs — rendered in a selected style.
     selectedTables?: SelectedTableSlot[],
     // Row uuids whose allowed slots render selected — a simpler alternative
@@ -137,7 +138,9 @@ watch(
 );
 
 // ─── Allowlist (slot-picking) mode ──────────────────────────────────────
-const allowlistActive = computed(() => (props.availableSlots?.length ?? 0) > 0);
+const overlayActive = computed(() =>
+    props.allowlistActive === true && (props.availableSlots?.length ?? 0) > 0
+);
 
 interface AllowedSlotRect {
     rowUuid: string | number,
@@ -218,7 +221,7 @@ const computeSuggestionAt = (
 ): NewFrameSuggestion | null => {
     if (!timeline || !timelineConfig) return null;
     // Click-to-add is disabled while the allowlist owns the editor.
-    if (allowlistActive.value) return null;
+    if (overlayActive.value) return null;
     if (rowUuid == null) return null;
 
     const row = timeline.state.sectionRowsByUuid[rowUuid];
@@ -281,7 +284,7 @@ const hoverSuggestion = computed<NewFrameSuggestion | null>(() => {
 
 // The suggestion currently in effect — null while the allowlist is active.
 const activeSuggestion = computed<NewFrameSuggestion | null>(() => {
-    if (allowlistActive.value) return null;
+    if (overlayActive.value) return null;
     return isTouch.value ? touchSuggestion.value : hoverSuggestion.value;
 });
 
@@ -373,20 +376,31 @@ const onSuggestionClick = (event: MouseEvent) => {
 <template>
     <Teleport to="#editorAreaTeleports" defer>
         <!-- Click-to-add suggestion box -->
-        <div
-            v-if="suggestionStyle"
-            class="vtd__new-frame-suggestion"
-            :style="suggestionStyle"
-            @click="onSuggestionClick"
-        >
-            <div v-if="isTouch" class="vtd__new-frame-suggestion-label">
-                <!-- Overrides the entire touch-mode label content. -->
-                <slot name="label" v-bind="labelSlotProps">{{ newFrameLabel }}</slot>
-            </div>
-        </div>
+        <template v-if="suggestionStyle && activeSuggestion">
+            <slot
+                name="suggestion"
+                :style="suggestionStyle"
+                :start-ms="activeSuggestion.start_ms"
+                :end-ms="activeSuggestion.end_ms"
+                :length-ms="activeSuggestion.end_ms - activeSuggestion.start_ms"
+                :row-uuid="activeSuggestion.rowUuid"
+                :section-uuid="activeSuggestion.sectionUuid"
+                :on-click="onSuggestionClick"
+            >
+                <div
+                    class="vtd__new-frame-suggestion"
+                    :style="suggestionStyle"
+                    @click="onSuggestionClick"
+                >
+                    <div v-if="isTouch" class="vtd__new-frame-suggestion-label">
+                        <slot name="label" v-bind="labelSlotProps">{{ newFrameLabel }}</slot>
+                    </div>
+                </div>
+            </slot>
+        </template>
 
         <!-- Allowlist mode: dim + lock the editor, keep allowed slots clear -->
-        <template v-if="allowlistActive">
+        <template v-if="overlayActive">
             <!-- Lock layer — eats pointer events on the dimmed area. -->
             <div
                 class="vtd__allowlist-lock"
