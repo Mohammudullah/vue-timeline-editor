@@ -368,7 +368,13 @@ const onSuggestionClick = (event: MouseEvent) => {
     if (!s) return;
     // Don't let the click also clear the frame selection (outside-click).
     event.stopPropagation();
-    emit('add-frame', s, event);
+    // When availableSlots are defined (selection mode), treat the click as a
+    // slot pick so the parent can do single-select tracking without the overlay.
+    if ((props.availableSlots?.length ?? 0) > 0) {
+        emit('select-slot', s, event);
+    } else {
+        emit('add-frame', s, event);
+    }
     if (isTouch.value) touchSuggestion.value = null;
 };
 </script>
@@ -397,6 +403,43 @@ const onSuggestionClick = (event: MouseEvent) => {
                     </div>
                 </div>
             </slot>
+        </template>
+
+        <!-- Selected slot highlights — shown without the overlay so the
+             selection persists visually after clicking a suggestion. -->
+        <template v-if="!overlayActive">
+            <template
+                v-for="(slot, i) in allowedSlots.filter(s => s.selected)"
+                :key="`selected-highlight-${i}`"
+            >
+                <slot
+                    name="suggestionSelected"
+                    :style="{
+                        left: slot.left + 'px',
+                        top: slot.top + 'px',
+                        width: slot.width + 'px',
+                        height: slot.height + 'px',
+                        position: 'absolute',
+                        pointerEvents: 'none',
+                        boxSizing: 'border-box',
+                    }"
+                    :start-ms="slot.start_ms"
+                    :end-ms="slot.end_ms"
+                    :row-uuid="slot.rowUuid"
+                    :section-uuid="slot.sectionUuid"
+                >
+                    <div
+                        class="vtd__allowlist-slot vtd__allowlist-slot--selected"
+                        :style="{
+                            left: slot.left + 'px',
+                            top: slot.top + 'px',
+                            width: slot.width + 'px',
+                            height: slot.height + 'px',
+                            pointerEvents: 'none',
+                        }"
+                    />
+                </slot>
+            </template>
         </template>
 
         <!-- Allowlist mode: dim + lock the editor, keep allowed slots clear -->
