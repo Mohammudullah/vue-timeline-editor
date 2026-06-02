@@ -258,7 +258,17 @@ const computeSuggestionAt = (
     // the fixed-length box — the full-gap box already sits on frame edges.
     const snapping = features?.data.snapping;
     if (length != null && snapping) {
-        start = snapping.snapMs(start);
+        const snapped = snapping.snapMs(start);
+        // If snap moved start ahead of the cursor the cursor falls outside
+        // the box. Step back one interval so the cursor always stays inside.
+        if (snapped > onMs) {
+            const interval = timelineConfig.cols.minorGridInterval > 0
+                ? timelineConfig.cols.minorGridInterval
+                : timelineConfig.cols.majorGridInterval;
+            start = interval > 0 ? snapped - interval : onMs;
+        } else {
+            start = snapped;
+        }
     }
 
     start = Math.max(area.start_ms, Math.min(start, area.end_ms - len));
