@@ -4,6 +4,7 @@ import { useFeatures } from '../../composables/features/features';
 import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { usePlayhead } from '../../composables/features/playhead';
+import useUtils from '../../composables/utils';
 
 /**
  * <Playhead/>
@@ -32,12 +33,16 @@ const props = withDefaults(defineProps<{
     clickSeek?: boolean,
     // Scroll the editor so the playhead is in view once, after mount.
     onTimelineMountedScrollToPlayHead?: boolean,
+    // Minimum real-time ms between reactive position updates while playing.
+    // 0 = every frame (~60fps), 1000 = once per second, 60000 = once per minute.
+    updateInterval?: number,
 }>(), {
     rate: 1,
     loop: false,
     draggable: true,
     clickSeek: true,
     onTimelineMountedScrollToPlayHead: false,
+    updateInterval: 0,
 });
 
 const emit = defineEmits<{
@@ -64,6 +69,8 @@ if (!timeline || !timelineConfig || !features) {
 
 const playhead = computed(() => features?.data.playhead ?? null);
 
+const { secondsToTimeString } = useUtils();
+
 // Last position we emitted via `update:modelValue`. A two-way `v-model`
 // echoes our own emit straight back as a prop change — without this guard
 // that echo would re-`seek` mid-playback and fight the play loop.
@@ -84,6 +91,7 @@ watch(() => props.playing, (playing) => {
 
 watch(() => props.rate, (rate) => playhead.value?.setRate(rate), { immediate: true });
 watch(() => props.loop, (loop) => playhead.value?.setLoop(loop), { immediate: true });
+watch(() => props.updateInterval, (v) => playhead.value?.setUpdateInterval(v), { immediate: true });
 watch(() => props.draggable, (v) => {
     if (playhead.value) playhead.value.options.draggable = v;
 }, { immediate: true });
@@ -169,16 +177,29 @@ onUnmounted(() => {
                 @pointerup="onScrubEnd"
                 @pointercancel="onScrubEnd"
             />
-            <div
+            <slot
                 v-if="playhead.view.inRange"
-                class="vtd__playhead-handle"
-                :class="{ 'vtd__playhead-handle--inert': !playhead.options.draggable }"
-                :style="{ left: playhead.view.pixelX + 'px' }"
-                @pointerdown="onHandleDown"
-                @pointermove="onScrubMove"
-                @pointerup="onScrubEnd"
-                @pointercancel="onScrubEnd"
-            />
+                name="handle"
+                :style="{ left: playhead.view.pixelX + 'px', position: 'absolute' }"
+                :pixel-x="playhead.view.pixelX"
+                :current-ms="playhead.state.currentMs"
+                :draggable="playhead.options.draggable"
+                :on-pointer-down="onHandleDown"
+                :on-pointer-move="onScrubMove"
+                :on-pointer-up="onScrubEnd"
+                :on-pointer-cancel="onScrubEnd"
+                :seconds-to-time-string="secondsToTimeString"
+            >
+                <div
+                    class="vtd__playhead-handle"
+                    :class="{ 'vtd__playhead-handle--inert': !playhead.options.draggable }"
+                    :style="{ left: playhead.view.pixelX + 'px' }"
+                    @pointerdown="onHandleDown"
+                    @pointermove="onScrubMove"
+                    @pointerup="onScrubEnd"
+                    @pointercancel="onScrubEnd"
+                />
+            </slot>
         </Teleport>
 
         <!-- Vertical line — spans the full editor content height. Hidden

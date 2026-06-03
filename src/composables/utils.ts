@@ -44,6 +44,8 @@ const useUtils = () => {
             result += ` ${ampm}`;
         }
 
+        console.log({ result, hours, minutes, secondsPart, format, hideEmptySeconds, hideEmptyMinutes, ignoreLeadingZeroHours });
+
         return result;
     }
 

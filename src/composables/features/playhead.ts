@@ -23,6 +23,9 @@ export interface PlayheadOptions {
     draggable: boolean;
     // Whether clicking the ruler jumps the playhead there.
     clickSeek: boolean;
+    // Minimum real-time ms between reactive currentMs writes while playing.
+    // 0 = update every animation frame (~60fps). 1000 = update once per second.
+    updateInterval: number;
 }
 
 export const usePlayhead = ({
@@ -50,6 +53,7 @@ export const usePlayhead = ({
         loop: false,
         draggable: true,
         clickSeek: true,
+        updateInterval: 0,
     });
 
     // Reactive mirror of the scroll pane's horizontal scroll — DOM scroll
@@ -92,6 +96,7 @@ export const usePlayhead = ({
     // valid state (the playhead hides; an edge arrow points toward it).
     // Pointer gestures go through `seekFromClientX`, which clamps instead.
     const seek = (ms: number) => {
+        internalMs = ms;
         state.currentMs = ms;
     };
 
@@ -127,13 +132,17 @@ export const usePlayhead = ({
     // ---- play loop -------------------------------------------------------
     let rafId: number | null = null;
     let lastTs = 0;
+    let lastUpdateTs = 0;
+    // Tracks the true position every frame; state.currentMs is only written
+    // when updateInterval allows, so the internal position never lags.
+    let internalMs = state.currentMs;
 
     const tick = (ts: number) => {
         if (!state.playing) return;
         const delta = lastTs ? ts - lastTs : 0;
         lastTs = ts;
 
-        let next = state.currentMs + delta * options.rate;
+        let next = internalMs + delta * options.rate;
         if (next >= rangeEndMs()) {
             if (options.loop) {
                 const span = rangeEndMs() - rangeStartMs();
@@ -141,12 +150,20 @@ export const usePlayhead = ({
                     ? rangeStartMs() + ((next - rangeStartMs()) % span)
                     : rangeStartMs();
             } else {
+                internalMs = rangeEndMs();
                 state.currentMs = rangeEndMs();
                 pause();
                 return;
             }
         }
-        state.currentMs = next;
+        internalMs = next;
+
+        const interval = options.updateInterval;
+        if (interval <= 0 || (ts - lastUpdateTs) >= interval) {
+            state.currentMs = internalMs;
+            lastUpdateTs = ts;
+        }
+
         rafId = requestAnimationFrame(tick);
     };
 
@@ -154,8 +171,10 @@ export const usePlayhead = ({
         if (state.playing) return;
         // Restart from the beginning if parked at the end.
         if (state.currentMs >= rangeEndMs()) state.currentMs = rangeStartMs();
+        internalMs = state.currentMs;
         state.playing = true;
         lastTs = 0;
+        lastUpdateTs = 0;
         rafId = requestAnimationFrame(tick);
     };
 
@@ -171,6 +190,7 @@ export const usePlayhead = ({
     const setRate = (rate: number) => { options.rate = rate; };
     const getRate = () => options.rate;
     const setLoop = (loop: boolean) => { options.loop = loop; };
+    const setUpdateInterval = (ms: number) => { options.updateInterval = Math.max(0, ms); };
 
     // Keep the scroll mirror in sync with whichever pane is mounted.
     watch(() => timeline.state.scrollPaneEl, (pane, oldPane) => {
@@ -205,6 +225,7 @@ export const usePlayhead = ({
         setRate,
         getRate,
         setLoop,
+        setUpdateInterval,
     };
 };
 
