@@ -81,7 +81,9 @@ export const useTimelineConfig = (
         timeAxis: {
             timeFormat: timeAxisTimeFormat,
         },
-        range: { start_seconds: 0, end_seconds: 24 * 60 * 60 }
+        range: { start_seconds: 0, end_seconds: 24 * 60 * 60 },
+        syncEditor: () => {},
+        syncEditorViewPort: () => {},
     })
 
 
@@ -256,6 +258,9 @@ export const useTimelineConfig = (
     //sync editor viewport on offset change (for example, when label width changes)
     watch([() => data.editor.containerOffset, timelineEditor], syncEditorViewPort)
 
+    data.syncEditor = syncEditor;
+    data.syncEditorViewPort = syncEditorViewPort;
+
     return data
 }
 
@@ -315,4 +320,6 @@ export interface TimelineConfigInterface {
         timeFormat: TimeStringTimeFormatOptions,
     },
     range: TimelineRangeInterface,
+    syncEditor: () => void,
+    syncEditorViewPort: () => void,
 }

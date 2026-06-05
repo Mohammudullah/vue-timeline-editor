@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, provide, ref, useSlots } from 'vue';
+import { computed, onBeforeUnmount, onMounted, provide, ref, useSlots } from 'vue';
 import { useTimeline, UseTimelineInterface } from '../composables/timeline';
 import { TimelineRangeArgInterface } from '../types/timeline';
 import { TimelineConfigInterface, useTimelineConfig } from '../composables/timelineConfig';
@@ -68,6 +68,12 @@ const timeline = useTimeline({
 const features = useFeatures({
     timeline,
     timelineConfig,
+});
+
+const visibleSectionUuids = computed(() => {
+    const filter = timeline.state.sectionUuidFilter;
+    if (!filter || filter.length === 0) return timeline.state.sectionUuids;
+    return timeline.state.sectionUuids.filter(uuid => filter.includes(uuid));
 });
 
 provide('timeline', timeline);
@@ -190,7 +196,7 @@ onBeforeUnmount(() => {
                             class="vtd__timeline-sections"
                         >
                             <Section
-                                v-for="uuid in timeline.state.sectionUuids"
+                                v-for="uuid in visibleSectionUuids"
                                 :key="uuid"
                                 :uuid="uuid"
                                 :config="timelineConfig"

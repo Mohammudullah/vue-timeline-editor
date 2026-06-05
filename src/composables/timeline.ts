@@ -12,6 +12,9 @@ export interface TimelineInterface {
     sectionsByUuid: Record<string | number, TimelineSectionByUuidInterface>,
 
     sectionUuids: (string | number)[],
+    // When non-null, only sections whose uuid is in this list are rendered.
+    // null / empty array both mean "show all".
+    sectionUuidFilter: (string | number)[] | null,
     sectionRowUuids: Record<string | number, (string | number)[]>,
     sectionFrameUuids: Record<string | number, (string | number)[]>,
     sectionsCount: number,
@@ -100,6 +103,7 @@ export const useTimeline = (
         attentionFrameUuids: {},
 
         sectionUuids: [],
+        sectionUuidFilter: null,
         sectionRowUuids: {},
         sectionFrameUuids: {},
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
@@ -49,6 +49,9 @@ const props = withDefaults(defineProps<{
     // (selectByUuid, scrollToViewPort(_, _, true), API calls, auto-cleanup
     // after removeFrame, etc.) are silent.
     silentExternalSelection?: boolean,
+    // Only render sections whose uuid is in this list.
+    // Pass null, undefined, or an empty array to show all sections.
+    filteredSections?: (string | number)[] | null,
 }>(), {
     rowClickable: false,
     newFrameLabel: '+ Add',
@@ -100,6 +103,14 @@ if (!timeline || !timelineConfig) {
 onMounted(() => {
     timeline?.initSections(props.sections);
 });
+
+watch(() => props.filteredSections, (filter) => {
+    if (timeline) timeline.state.sectionUuidFilter = filter ?? null;
+    nextTick(() => {
+        timelineConfig?.syncEditor();
+        timelineConfig?.syncEditorViewPort();
+    });
+}, { immediate: true });
 
 // ─── Frame interaction events ───────────────────────────────────────────
 // Press-and-hold — surfaced as `frame-hold`.
