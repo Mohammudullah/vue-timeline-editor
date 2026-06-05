@@ -12,9 +12,6 @@ export interface TimelineInterface {
     sectionsByUuid: Record<string | number, TimelineSectionByUuidInterface>,
 
     sectionUuids: (string | number)[],
-    // When non-null, only sections whose uuid is in this list are rendered.
-    // null / empty array both mean "show all".
-    sectionUuidFilter: (string | number)[] | null,
     sectionRowUuids: Record<string | number, (string | number)[]>,
     sectionFrameUuids: Record<string | number, (string | number)[]>,
     sectionsCount: number,
@@ -103,7 +100,6 @@ export const useTimeline = (
         attentionFrameUuids: {},
 
         sectionUuids: [],
-        sectionUuidFilter: null,
         sectionRowUuids: {},
         sectionFrameUuids: {},
 
@@ -201,7 +197,19 @@ export const useTimeline = (
     }
 
 
-    const initSections = (sections: TimelineSectionInterface[]) => {
+    // Full, unfiltered section data last passed to initSections.
+    // setSectionFilter rebuilds positions from this so filtering never loses frames.
+    let fullSectionsData: TimelineSectionInterface[] = [];
+    // Active filter — persisted so a late initSections call (async fetch) re-applies it.
+    let activeSectionFilter: (string | number)[] | null = null;
+
+    const applyFilter = (filter: (string | number)[] | null) => {
+        if (!filter || filter.length === 0) return rebuildSections(fullSectionsData);
+        const filterSet = new Set(filter.map(f => String(f)));
+        rebuildSections(fullSectionsData.filter(s => filterSet.has(String(s.uuid))));
+    };
+
+    const rebuildSections = (sections: TimelineSectionInterface[]) => {
 
         //clear existing data
         state.sectionUuids = [];
@@ -281,7 +289,17 @@ export const useTimeline = (
 
 
         calculateRowsCenterCache();
-    }
+    };
+
+    const initSections = (sections: TimelineSectionInterface[]) => {
+        fullSectionsData = sections;
+        applyFilter(activeSectionFilter);
+    };
+
+    const setSectionFilter = (filter: (string | number)[] | null) => {
+        activeSectionFilter = filter ?? null;
+        applyFilter(activeSectionFilter);
+    };
 
 
     const getEmptyAreasOfRow = (rowUuid: string | number, start_ms: number, end_ms: number) => {
@@ -932,6 +950,7 @@ export const useTimeline = (
     return {
         state,
         initSections,
+        setSectionFilter,
         updateFrame,
         updateRow,
         enableEdgeScrolling,

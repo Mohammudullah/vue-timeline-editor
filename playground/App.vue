@@ -230,6 +230,14 @@ const emptySections = sections.map(s => ({
     rows: s.rows.map(r => ({ ...r, frames: [] })),
 }));
 
+// ─── Section filter test ────────────────────────────────────────────────
+// Mirrors the real-app pattern: sections are loaded async via initSections(),
+// and the filter is applied via the filteredSections prop afterward.
+const filteredSectionIds = ref<(string | number)[] | null>(null);
+const setFloorFilter = (ids: (string | number)[] | null) => {
+    filteredSectionIds.value = ids;
+};
+
 // ─── Example 1 — optimistic add with server-side merge ───────────────────
 // Frame appears immediately in row2 with a temp uuid. The server "assigns"
 // a real uuid and the timeline swaps it in. If the server rejects, the
@@ -397,6 +405,10 @@ const confirmJoin = () => {
                 playhead: {{ (playheadMs / 1000).toFixed(1) }}s
             </span>
             <button @click="tintRowLabels">🎨 Tint row labels</button>
+            <span style="align-self:center;color:#666;margin-left:8px;">Floor filter:</span>
+            <button @click="setFloorFilter(null)" :style="{ fontWeight: !filteredSectionIds ? 'bold' : 'normal' }">All</button>
+            <button @click="setFloorFilter(['section1'])" :style="{ fontWeight: filteredSectionIds?.[0] === 'section1' ? 'bold' : 'normal' }">Section 1</button>
+            <button @click="setFloorFilter(['section2'])" :style="{ fontWeight: filteredSectionIds?.[0] === 'section2' ? 'bold' : 'normal' }">Section 2</button>
             <template v-if="availableSlots.length">
                 <button @click="confirmJoin">
                     ✓ Confirm join ({{ selectedRowUuids.length }})
@@ -431,6 +443,7 @@ const confirmJoin = () => {
                 :available-slots="availableSlots"
                 :selected-row-uuids="selectedRowUuids"
                 :sections="emptySections"
+                :filtered-sections="filteredSectionIds"
             >
                 <!-- Touch-mode label override — shows the proposed length. -->
                 <template #label="{ length_ms }">

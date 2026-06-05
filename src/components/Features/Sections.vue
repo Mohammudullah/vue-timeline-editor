@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { UseTimelineInterface } from '../../composables/timeline';
 import { TimelineConfigInterface } from '../../composables/timelineConfig';
 import { useFeatures } from '../../composables/features/features';
@@ -100,17 +100,25 @@ if (!timeline || !timelineConfig) {
     console.error('Sections: Timeline and TimelineConfig must be provided.');
 }
 
-onMounted(() => {
-    timeline?.initSections(props.sections);
-});
-
-watch(() => props.filteredSections, (filter) => {
-    if (timeline) timeline.state.sectionUuidFilter = filter ?? null;
+// Full section data → always stored inside useTimeline via initSections.
+// Changing this reinitializes the full dataset (frames included).
+watch(() => props.sections, (sections) => {
+    timeline?.initSections(sections);
     nextTick(() => {
         timelineConfig?.syncEditor();
         timelineConfig?.syncEditorViewPort();
     });
 }, { immediate: true });
+
+// Filter changes rebuild positions from the already-stored full data so
+// frames loaded via api.timeline.initSections() are never discarded.
+watch(() => props.filteredSections, (filter) => {
+    timeline?.setSectionFilter(filter ?? null);
+    nextTick(() => {
+        timelineConfig?.syncEditor();
+        timelineConfig?.syncEditorViewPort();
+    });
+});
 
 // ─── Frame interaction events ───────────────────────────────────────────
 // Press-and-hold — surfaced as `frame-hold`.

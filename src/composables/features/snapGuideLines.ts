@@ -39,12 +39,7 @@ export const useSnapGuideLines = ({
         const paddingLeft = timelineConfig.editor.paddingLeft;
         const labelHeight = timelineConfig.sections.labelHeight;
 
-        const filter = timeline.state.sectionUuidFilter;
-        const visibleUuids = filter?.length
-            ? timeline.state.sectionUuids.filter(uuid => filter.includes(uuid))
-            : timeline.state.sectionUuids;
-
-        state.sectionRowAreas = visibleUuids
+        state.sectionRowAreas = timeline.state.sectionUuids
             .map(uuid => {
                 const section = timeline.state.sectionsByUuid[uuid];
                 if (!section) return null;
