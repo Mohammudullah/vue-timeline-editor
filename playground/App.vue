@@ -10,6 +10,8 @@ import type { TimelineInitInterface } from '../src/components/Timeline.vue';
 import JoinRows from '../src/components/Features/JoinRows.vue';
 import PanScroll from '../src/components/Features/PanScroll.vue';
 import Playhead from '../src/components/Features/Playhead.vue';
+import BlockedAreas from '../src/components/Features/BlockedAreas.vue';
+import type { RowBlockage, SectionBlockage } from '../src/composables/features/blockedAreas';
 import '../src/styles/basic-theme.css';
 
 // Fake server: resolves after `ms` if `shouldFail` is false; rejects otherwise.
@@ -230,6 +232,36 @@ const emptySections = sections.map(s => ({
     rows: s.rows.map(r => ({ ...r, frames: [] })),
 }));
 
+// ─── Blocked areas test ─────────────────────────────────────────────────
+// row1-3 consecutive → 1 merged block (time-bounded)
+// row5+6+7 consecutive + row9+10 consecutive → 2 blocks (full-width)
+// section2 → full-section block (time-bounded, no top/bottom border)
+const rowBlockagesData = ref<RowBlockage[]>([
+    {
+        block_ulid: 'block-01',
+        rowUuids: ['row1', 'row2', 'row3'],
+        start_ms: m(200),
+        end_ms: m(400),
+        title: '18:00 – 22:00',
+    },
+    {
+        block_ulid: 'block-02',
+        rowUuids: ['row5', 'row6', 'row7', 'row9', 'row10'],
+        full_row: true,
+        title: 'All day',
+    },
+]);
+const sectionBlockagesData = ref<SectionBlockage[]>([
+    {
+        block_ulid: 'block-03',
+        sectionUuid: 'section2',
+        start_ms: m(300),
+        end_ms: m(600),
+        title: 'Floor closed',
+    },
+]);
+const blockagesVisible = ref(true);
+
 // ─── Section filter test ────────────────────────────────────────────────
 // Mirrors the real-app pattern: sections are loaded async via initSections(),
 // and the filter is applied via the filteredSections prop afterward.
@@ -405,6 +437,9 @@ const confirmJoin = () => {
                 playhead: {{ (playheadMs / 1000).toFixed(1) }}s
             </span>
             <button @click="tintRowLabels">🎨 Tint row labels</button>
+            <button @click="blockagesVisible = !blockagesVisible">
+                {{ blockagesVisible ? '🔓 Hide blockages' : '🔒 Show blockages' }}
+            </button>
             <span style="align-self:center;color:#666;margin-left:8px;">Floor filter:</span>
             <button @click="setFloorFilter(null)" :style="{ fontWeight: !filteredSectionIds ? 'bold' : 'normal' }">All</button>
             <button @click="setFloorFilter(['section1'])" :style="{ fontWeight: filteredSectionIds?.[0] === 'section1' ? 'bold' : 'normal' }">Section 1</button>
@@ -478,6 +513,11 @@ const confirmJoin = () => {
                 v-model:playing="playheadPlaying"
                 :rate="60"
                 loop
+            />
+            <BlockedAreas
+                v-if="blockagesVisible"
+                :row-blockages="rowBlockagesData"
+                :section-blockages="sectionBlockagesData"
             />
         </Timeline>
     </div>

@@ -473,3 +473,33 @@
     border-left: 1px dashed rgba(80, 140, 255, 0.4);
     transition: all 100ms cubic-bezier(0.2, 0, 0, 1);
 }
+
+/**------------ Blocked Areas Styles Start ---------------**/
+
+.vtd__blockage-default {
+    background: repeating-linear-gradient(
+        -45deg,
+        rgba(0, 0, 0, 0.035) 0px,
+        rgba(0, 0, 0, 0.035) 4px,
+        rgba(0, 0, 0, 0.065) 4px,
+        rgba(0, 0, 0, 0.065) 8px
+    );
+}
+
+.vtd__blockage--row .vtd__blockage-default {
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 2px;
+}
+
+.vtd__blockage--section .vtd__blockage-default {
+    border-left: 1px solid rgba(0, 0, 0, 0.12);
+    border-right: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.vtd__blockage-default-title {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.45);
+}
+
+/**------------ Blocked Areas Styles End ---------------**/
